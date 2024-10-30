@@ -50,17 +50,19 @@ class Signal:
                 f.write(f"{idx} {val}\n")
 
     @classmethod
-    def generate_sine(cls, amplitude, phase_shift, frequency, sampling_freq, duration):
-        t = np.arange(0, duration, 1/sampling_freq)
+    def generate_sine(cls, amplitude, phase_shift, frequency, sampling_freq):
+        N = 50  # Fixed number of samples
+        t = np.arange(N) / sampling_freq  # Time vector
         samples = amplitude * np.sin(2 * np.pi * frequency * t + phase_shift)
-        indices = list(range(len(samples)))
+        indices = list(range(N))
         return cls(indices, samples.tolist())
 
     @classmethod
-    def generate_cosine(cls, amplitude, phase_shift, frequency, sampling_freq, duration):
-        t = np.arange(0, duration, 1/sampling_freq)
+    def generate_cosine(cls, amplitude, phase_shift, frequency, sampling_freq):
+        N = 50  # Fixed number of samples
+        t = np.arange(N) / sampling_freq  # Time vector
         samples = amplitude * np.cos(2 * np.pi * frequency * t + phase_shift)
-        indices = list(range(len(samples)))
+        indices = list(range(N))
         return cls(indices, samples.tolist())
 
 # Signal Operations
@@ -117,143 +119,6 @@ class SignalOperations:
         folded_samples = list(reversed(signal.samples))
         return Signal(folded_indices, folded_samples)
 
-
-
-# Task 1 Tests
-def ReadSignalFile(file_name):
-    expected_indices=[]
-    expected_samples=[]
-    with open(file_name, 'r') as f:
-        line = f.readline()
-        line = f.readline()
-        line = f.readline()
-        line = f.readline()
-        while line:
-            # process line
-            L=line.strip()
-            if len(L.split(' '))==2:
-                L=line.split(' ')
-                V1=int(L[0])
-                V2=float(L[1])
-                expected_indices.append(V1)
-                expected_samples.append(V2)
-                line = f.readline()
-            else:
-                break
-    return expected_indices,expected_samples
-
-
-
-def AddSignalSamplesAreEqual(userFirstSignal,userSecondSignal,Your_indices,Your_samples):
-    if(userFirstSignal=='Signal1.txt' and userSecondSignal=='Signal2.txt'):
-        file_name="add.txt"  # write here the path of the add output file
-    expected_indices,expected_samples=ReadSignalFile(file_name)          
-    if (len(expected_samples)!=len(Your_samples)) and (len(expected_indices)!=len(Your_indices)):
-        print("Addition Test case failed, your signal have different length from the expected one")
-        return
-    for i in range(len(Your_indices)):
-        if(Your_indices[i]!=expected_indices[i]):
-            print("Addition Test case failed, your signal have different indicies from the expected one") 
-            return
-    for i in range(len(expected_samples)):
-        if abs(Your_samples[i] - expected_samples[i]) < 0.01:
-            continue
-        else:
-            print("Addition Test case failed, your signal have different values from the expected one") 
-            return
-    print("Addition Test case passed successfully")
-
-
-
-def SubSignalSamplesAreEqual(userFirstSignal,userSecondSignal,Your_indices,Your_samples):
-    if(userFirstSignal=='Signal1.txt' and userSecondSignal=='Signal2.txt'):
-        file_name="subtract.txt" # write here the path of the subtract output file
-        
-    expected_indices,expected_samples=ReadSignalFile(file_name)   
-    
-    if (len(expected_samples)!=len(Your_samples)) and (len(expected_indices)!=len(Your_indices)):
-        print("Subtraction Test case failed, your signal have different length from the expected one")
-        return
-    for i in range(len(Your_indices)):
-        if(Your_indices[i]!=expected_indices[i]):
-            print("Subtraction Test case failed, your signal have different indicies from the expected one") 
-            return
-    for i in range(len(expected_samples)):
-        if abs(Your_samples[i] - expected_samples[i]) < 0.01:
-            continue
-        else:
-            print("Subtraction Test case failed, your signal have different values from the expected one") 
-            return
-    print("Subtraction Test case passed successfully")
-
-
-
-def MultiplySignalByConst(User_Const,Your_indices,Your_samples):
-    if(User_Const==5):
-        file_name="mul5.txt"  # write here the path of the mul5 output file
-        
-    expected_indices,expected_samples=ReadSignalFile(file_name)      
-    if (len(expected_samples)!=len(Your_samples)) and (len(expected_indices)!=len(Your_indices)):
-        print("Multiply by "+str(User_Const)+ " Test case failed, your signal have different length from the expected one")
-        return
-    for i in range(len(Your_indices)):
-        if(Your_indices[i]!=expected_indices[i]):
-            print("Multiply by "+str(User_Const)+" Test case failed, your signal have different indicies from the expected one") 
-            return
-    for i in range(len(expected_samples)):
-        if abs(Your_samples[i] - expected_samples[i]) < 0.01:
-            continue
-        else:
-            print("Multiply by "+str(User_Const)+" Test case failed, your signal have different values from the expected one") 
-            return
-    print("Multiply by "+str(User_Const)+" Test case passed successfully")
-
-
-
-def ShiftSignalByConst(Shift_value,Your_indices,Your_samples):
-    if(Shift_value==3):  #x(n+k)
-        file_name="advance3.txt" # write here the path of delay3 output file
-    elif(Shift_value==-3): #x(n-k)
-        file_name="delay3.txt" # write here the path of advance3 output file
-        
-    expected_indices,expected_samples=ReadSignalFile(file_name)      
-    if (len(expected_samples)!=len(Your_samples)) and (len(expected_indices)!=len(Your_indices)):
-        print("Shift by "+str(Shift_value)+" Test case failed, your signal have different length from the expected one")
-        return
-    for i in range(len(Your_indices)):
-        if(Your_indices[i]!=expected_indices[i]):
-            print("Shift by "+str(Shift_value)+" Test case failed, your signal have different indicies from the expected one") 
-            return
-    for i in range(len(expected_samples)):
-        if abs(Your_samples[i] - expected_samples[i]) < 0.01:
-            continue
-        else:
-            print("Shift by "+str(Shift_value)+" Test case failed, your signal have different values from the expected one") 
-            return
-    print("Shift by "+str(Shift_value)+" Test case passed successfully")
-
-
-
-def Folding(Your_indices,Your_samples):
-    file_name = "folding.txt"  # write here the path of the folding output file
-    expected_indices,expected_samples=ReadSignalFile(file_name)      
-    if (len(expected_samples)!=len(Your_samples)) and (len(expected_indices)!=len(Your_indices)):
-        print("Folding Test case failed, your signal have different length from the expected one")
-        return
-    for i in range(len(Your_indices)):
-        if(Your_indices[i]!=expected_indices[i]):
-            print("Folding Test case failed, your signal have different indicies from the expected one") 
-            return
-    for i in range(len(expected_samples)):
-        if abs(Your_samples[i] - expected_samples[i]) < 0.01:
-            continue
-        else:
-            print("Folding Test case failed, your signal have different values from the expected one") 
-            return
-    print("Folding Test case passed successfully")
-
-
-
 # Signal Processing App with GUI
 class SignalProcessingApp:
     def __init__(self, root):
@@ -261,22 +126,32 @@ class SignalProcessingApp:
         self.root.title("Digital Signal Processing App")
         self.signals = {}  # Dictionary to store loaded/generated signals
 
-        self.create_menu()
         self.create_widgets()
 
-    def create_menu(self):
-        menubar = tk.Menu(self.root)
-        self.root.config(menu=menubar)
-
-        # Signal Generation Menu
-        gen_menu = tk.Menu(menubar, tearoff=0)
-        menubar.add_cascade(label="Signal Generation", menu=gen_menu)
-        gen_menu.add_command(label="Sine Wave", command=self.generate_sine_wave)
-        gen_menu.add_command(label="Cosine Wave", command=self.generate_cosine_wave)
-
     def create_widgets(self):
+        # Create a Notebook for tabs
+        notebook = ttk.Notebook(self.root)
+        notebook.pack(expand=True, fill='both')
+
+        # Create frames for each tab
+        task1_frame = ttk.Frame(notebook)
+        task2_frame = ttk.Frame(notebook)
+        task3_frame = ttk.Frame(notebook)
+
+        # Add tabs to notebook
+        notebook.add(task1_frame, text='Task 1 - Signal Operations')
+        notebook.add(task2_frame, text='Task 2 - Signal Generation')
+        notebook.add(task3_frame, text='Task 3 - Quantization')
+
+        # Create widgets for each task
+        self.create_task1_widgets(task1_frame)
+        self.create_task2_widgets(task2_frame)
+        self.create_task3_widgets(task3_frame)
+
+    # Task 1 Widgets
+    def create_task1_widgets(self, frame):
         # Frame for signal operations
-        operations_frame = ttk.LabelFrame(self.root, text="Signal Operations")
+        operations_frame = ttk.LabelFrame(frame, text="Signal Operations")
         operations_frame.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
 
         # Load Signal Buttons
@@ -303,7 +178,7 @@ class SignalProcessingApp:
         fold_btn.grid(row=3, column=0, padx=5, pady=5)
 
         # Visualization Options
-        viz_frame = ttk.LabelFrame(self.root, text="Visualization Options")
+        viz_frame = ttk.LabelFrame(frame, text="Visualization Options")
         viz_frame.grid(row=1, column=0, padx=10, pady=10, sticky="nsew")
 
         self.representation = tk.StringVar(value="Discrete")
@@ -316,14 +191,245 @@ class SignalProcessingApp:
         plot_btn.grid(row=1, column=0, columnspan=2, padx=5, pady=5)
 
         # Frame for Matplotlib plot
-        plot_frame = ttk.Frame(self.root)
+        plot_frame = ttk.Frame(frame)
         plot_frame.grid(row=0, column=1, rowspan=2, padx=10, pady=10)
 
-        self.figure, self.ax = plt.subplots(figsize=(8,6))
-        self.canvas = FigureCanvasTkAgg(self.figure, master=plot_frame)
-        self.canvas.draw()
-        self.canvas.get_tk_widget().pack()
+        self.task1_figure, self.task1_ax = plt.subplots(figsize=(8,6))
+        self.task1_canvas = FigureCanvasTkAgg(self.task1_figure, master=plot_frame)
+        self.task1_canvas.draw()
+        self.task1_canvas.get_tk_widget().pack()
 
+    # Task 2 Widgets
+    def create_task2_widgets(self, frame):
+        # Input Frame
+        input_frame = ttk.LabelFrame(frame, text="Signal Parameters")
+        input_frame.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
+
+        # Wave Type Selection
+        self.wave_type = tk.StringVar(value='sine')
+        wave_type_frame = ttk.Frame(input_frame)
+        wave_type_frame.grid(row=0, column=0, columnspan=2, pady=5)
+        ttk.Label(wave_type_frame, text="Select Wave Type:").grid(row=0, column=0, padx=5)
+        sine_rb = ttk.Radiobutton(wave_type_frame, text="Sine", variable=self.wave_type, value='sine')
+        sine_rb.grid(row=0, column=1, padx=5)
+        cosine_rb = ttk.Radiobutton(wave_type_frame, text="Cosine", variable=self.wave_type, value='cosine')
+        cosine_rb.grid(row=0, column=2, padx=5)
+
+        ttk.Label(input_frame, text="Amplitude (A):").grid(row=1, column=0, padx=5, pady=5)
+        self.amplitude_entry = ttk.Entry(input_frame)
+        self.amplitude_entry.grid(row=1, column=1, padx=5, pady=5)
+
+        ttk.Label(input_frame, text="Phase Shift (θ in radians):").grid(row=2, column=0, padx=5, pady=5)
+        self.phase_entry = ttk.Entry(input_frame)
+        self.phase_entry.grid(row=2, column=1, padx=5, pady=5)
+
+        ttk.Label(input_frame, text="Analog Frequency (Hz):").grid(row=3, column=0, padx=5, pady=5)
+        self.freq_entry = ttk.Entry(input_frame)
+        self.freq_entry.grid(row=3, column=1, padx=5, pady=5)
+
+        ttk.Label(input_frame, text="Sampling Frequency (Hz):").grid(row=4, column=0, padx=5, pady=5)
+        self.sampling_freq_entry = ttk.Entry(input_frame)
+        self.sampling_freq_entry.grid(row=4, column=1, padx=5, pady=5)
+
+        generate_btn = ttk.Button(input_frame, text="Generate Signal", command=self.generate_task2_signal)
+        generate_btn.grid(row=5, column=0, columnspan=2, pady=10)
+
+        # Visualization Options
+        viz_frame = ttk.LabelFrame(frame, text="Visualization Options")
+        viz_frame.grid(row=1, column=0, padx=10, pady=10, sticky="nsew")
+
+        self.task2_representation = tk.StringVar(value="Discrete")
+        cont_rb = ttk.Radiobutton(viz_frame, text="Continuous", variable=self.task2_representation, value="Continuous")
+        cont_rb.grid(row=0, column=0, padx=5, pady=5)
+        disc_rb = ttk.Radiobutton(viz_frame, text="Discrete", variable=self.task2_representation, value="Discrete")
+        disc_rb.grid(row=0, column=1, padx=5, pady=5)
+
+        # Plot Frame
+        plot_frame = ttk.Frame(frame)
+        plot_frame.grid(row=0, column=1, rowspan=2, padx=10, pady=10)
+
+        self.task2_figure, self.task2_ax = plt.subplots(figsize=(8,6))
+        self.task2_canvas = FigureCanvasTkAgg(self.task2_figure, master=plot_frame)
+        self.task2_canvas.draw()
+        self.task2_canvas.get_tk_widget().pack()
+
+    def generate_task2_signal(self):
+        amplitude_str = self.amplitude_entry.get()
+        phase_str = self.phase_entry.get()
+        freq_str = self.freq_entry.get()
+        sampling_freq_str = self.sampling_freq_entry.get()
+        wave_type = self.wave_type.get()  # Get the selected wave type
+
+        try:
+            amplitude = float(amplitude_str)
+            phase = float(phase_str)
+            freq = float(freq_str)
+            sampling_freq = float(sampling_freq_str)
+
+            if sampling_freq < 2 * freq:
+                messagebox.showerror("Error", "Sampling frequency must be at least twice the analog frequency (Nyquist rate).")
+                return
+
+            # Generate signal
+            if wave_type == 'sine':
+                generated_signal = Signal.generate_sine(amplitude, phase, freq, sampling_freq)
+            else:
+                generated_signal = Signal.generate_cosine(amplitude, phase, freq, sampling_freq)
+
+            # Plot signal
+            self.task2_ax.clear()
+            representation = self.task2_representation.get()
+            indices = generated_signal.indices
+            samples = generated_signal.samples
+
+            if representation == "Continuous":
+                self.task2_ax.plot(indices, samples, label=f'{wave_type.capitalize()} Signal')
+            else:
+                try:
+                    self.task2_ax.stem(indices, samples, label=f'{wave_type.capitalize()} Signal', use_line_collection=True)
+                except TypeError:
+                    self.task2_ax.stem(indices, samples, label=f'{wave_type.capitalize()} Signal')
+
+            self.task2_ax.set_xlabel('Sample Index')
+            self.task2_ax.set_ylabel('Amplitude')
+            self.task2_ax.set_title(f"{wave_type.capitalize()} Signal")
+            self.task2_ax.legend()
+            self.task2_ax.grid(True)
+            self.task2_canvas.draw()
+
+            # Store the generated signal
+            name = f"Generated_{wave_type.capitalize()}_{len(self.signals)+1}"
+            self.signals[name] = generated_signal
+            messagebox.showinfo("Success", f"{wave_type.capitalize()} signal generated successfully as '{name}'.")
+
+        except ValueError:
+            messagebox.showerror("Error", "Please enter valid numerical values.")
+
+
+    # Task 3 Widgets
+    def create_task3_widgets(self, frame):
+        # Input Frame
+        input_frame = ttk.LabelFrame(frame, text="Quantization Parameters")
+        input_frame.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
+
+        load_signal_btn = ttk.Button(input_frame, text="Select Signal", command=self.load_quantization_signal)
+        load_signal_btn.grid(row=0, column=0, padx=5, pady=5)
+
+        ttk.Label(input_frame, text="Number of Levels:").grid(row=1, column=0, padx=5, pady=5)
+        self.levels_entry = ttk.Entry(input_frame)
+        self.levels_entry.grid(row=1, column=1, padx=5, pady=5)
+
+        ttk.Label(input_frame, text="Number of Bits:").grid(row=2, column=0, padx=5, pady=5)
+        self.bits_entry = ttk.Entry(input_frame)
+        self.bits_entry.grid(row=2, column=1, padx=5, pady=5)
+
+        quantize_btn = ttk.Button(input_frame, text="Quantize Signal", command=self.quantize_signal)
+        quantize_btn.grid(row=3, column=0, columnspan=2, pady=10)
+
+        # Plot Frame
+        plot_frame = ttk.Frame(frame)
+        plot_frame.grid(row=0, column=1, padx=10, pady=10)
+
+        self.task3_figure, self.task3_axes = plt.subplots(2, 1, figsize=(8,8))
+        self.task3_canvas = FigureCanvasTkAgg(self.task3_figure, master=plot_frame)
+        self.task3_canvas.draw()
+        self.task3_canvas.get_tk_widget().pack()
+
+    def load_quantization_signal(self):
+        # Allow user to select from existing signals
+        signal_names = list(self.signals.keys())
+        if signal_names:
+            def select_signal():
+                selected = signal_listbox.curselection()
+                if selected:
+                    index = selected[0]
+                    signal_name = signal_names[index]
+                    self.quantization_signal = self.signals[signal_name]
+                    messagebox.showinfo("Success", f"Signal '{signal_name}' selected for quantization.")
+                    select_window.destroy()
+                else:
+                    messagebox.showwarning("Warning", "Please select a signal.")
+            
+            select_window = tk.Toplevel(self.root)
+            select_window.title("Select Signal for Quantization")
+            ttk.Label(select_window, text="Select Signal:").pack(padx=5, pady=5)
+            signal_listbox = tk.Listbox(select_window)
+            signal_listbox.pack(padx=5, pady=5)
+            for name in signal_names:
+                signal_listbox.insert(tk.END, name)
+            ttk.Button(select_window, text="Select", command=select_signal).pack(pady=5)
+
+        else:
+            messagebox.showwarning("Warning", "No signals available. Please generate or load a signal first.")
+
+    def quantize_signal(self):
+        if not hasattr(self, 'quantization_signal'):
+            messagebox.showwarning("Warning", "Please select a signal for quantization.")
+            return
+
+        levels_str = self.levels_entry.get()
+        bits_str = self.bits_entry.get()
+
+        try:
+            if levels_str:
+                levels = int(levels_str)
+            elif bits_str:
+                bits = int(bits_str)
+                levels = 2 ** bits
+            else:
+                messagebox.showerror("Error", "Please enter number of levels or number of bits.")
+                return
+
+            # Perform quantization
+            signal = self.quantization_signal
+            samples = np.array(signal.samples)
+            min_val = np.min(samples)
+            max_val = np.max(samples)
+
+            # Compute quantization step size
+            q_step = (max_val - min_val) / levels
+
+            # Quantize samples
+            quantized_samples = np.floor((samples - min_val) / q_step) * q_step + min_val + q_step / 2
+
+            # Quantization error
+            error = samples - quantized_samples
+
+            # Encode quantized samples
+            encoded_samples = ((quantized_samples - min_val) / q_step).astype(int)
+
+            # Plot original and quantized signal
+            self.task3_axes[0].clear()
+            self.task3_axes[0].plot(signal.indices, samples, label='Original Signal')
+            self.task3_axes[0].step(signal.indices, quantized_samples, where='mid', label='Quantized Signal')
+            self.task3_axes[0].set_xlabel('Sample Index')
+            self.task3_axes[0].set_ylabel('Amplitude')
+            self.task3_axes[0].set_title('Original and Quantized Signal')
+            self.task3_axes[0].legend()
+            self.task3_axes[0].grid(True)
+
+            # Plot quantization error
+            self.task3_axes[1].clear()
+            try:
+                self.task3_axes[1].stem(signal.indices, error, label='Quantization Error', use_line_collection=True)
+            except TypeError:
+                self.task3_axes[1].stem(signal.indices, error, label='Quantization Error')
+            self.task3_axes[1].set_xlabel('Sample Index')
+            self.task3_axes[1].set_ylabel('Error')
+            self.task3_axes[1].set_title('Quantization Error')
+            self.task3_axes[1].legend()
+            self.task3_axes[1].grid(True)
+
+            self.task3_canvas.draw()
+
+            # Display encoded signal
+            encoded_str = ' '.join(map(str, encoded_samples))
+            messagebox.showinfo("Encoded Signal", f"Encoded Levels:\n{encoded_str}")
+
+        except ValueError:
+            messagebox.showerror("Error", "Please enter valid integer values for levels or bits.")
+
+    # Existing methods for Task 1
     def load_signal(self, signal_number):
         file_path = filedialog.askopenfilename(title="Select Signal File", filetypes=(("Text Files", "*.txt"),))
         if file_path:
@@ -413,7 +519,7 @@ class SignalProcessingApp:
             messagebox.showwarning("Warning", "Please load Signal 1.")
 
     def plot_signals(self):
-        self.ax.clear()
+        self.task1_ax.clear()
         representation = self.representation.get()
         plot_continuous = representation == "Continuous"
 
@@ -430,125 +536,22 @@ class SignalProcessingApp:
             t = signal.indices
             s = signal.samples
             if plot_continuous:
-                self.ax.plot(t, s, label=name)
+                self.task1_ax.plot(t, s, label=name)
             else:
                 try:
-                    self.ax.stem(t, s, label=name, use_line_collection=True)
+                    self.task1_ax.stem(t, s, label=name, use_line_collection=True)
                 except TypeError:
                     # Fallback if use_line_collection is not supported
-                    self.ax.stem(t, s, label=name)
+                    self.task1_ax.stem(t, s, label=name)
 
-        self.ax.set_xlabel("n")
-        self.ax.set_ylabel("Amplitude")
-        self.ax.set_title("Signal Visualization")
-        self.ax.legend()
-        self.ax.grid(True)
-        self.canvas.draw()
-
-    def generate_sine_wave(self):
-        self.open_signal_generation_window('sine')
-
-    def generate_cosine_wave(self):
-        self.open_signal_generation_window('cosine')
-
-    def open_signal_generation_window(self, wave_type):
-        def perform_generation():
-            try:
-                amplitude = float(amplitude_entry.get())
-                phase = float(phase_entry.get())
-                freq = float(freq_entry.get())
-                sampling_freq = float(sampling_freq_entry.get())
-                duration = float(duration_entry.get())
-
-                # Check Sampling Theorem
-                if sampling_freq < 2 * freq:
-                    messagebox.showerror("Error", "Sampling frequency must be at least twice the analog frequency (Nyquist rate).")
-                    return
-
-                if wave_type == 'sine':
-                    generated_signal = Signal.generate_sine(amplitude, phase, freq, sampling_freq, duration)
-                else:
-                    generated_signal = Signal.generate_cosine(amplitude, phase, freq, sampling_freq, duration)
-
-                # Assign a unique name
-                name = f"Generated_{wave_type.capitalize()}_{len(self.signals)+1}"
-                self.signals[name] = generated_signal
-                messagebox.showinfo("Success", f"{wave_type.capitalize()} wave generated successfully as '{name}'.")
-                gen_window.destroy()
-            except ValueError:
-                messagebox.showerror("Error", "Please enter valid numerical values.")
-
-        gen_window = tk.Toplevel(self.root)
-        gen_window.title(f"Generate {wave_type.capitalize()} Wave")
-
-        ttk.Label(gen_window, text="Amplitude (A):").grid(row=0, column=0, padx=5, pady=5)
-        amplitude_entry = ttk.Entry(gen_window)
-        amplitude_entry.grid(row=0, column=1, padx=5, pady=5)
-
-        ttk.Label(gen_window, text="Phase Shift (θ in radians):").grid(row=1, column=0, padx=5, pady=5)
-        phase_entry = ttk.Entry(gen_window)
-        phase_entry.grid(row=1, column=1, padx=5, pady=5)
-
-        ttk.Label(gen_window, text="Analog Frequency (Hz):").grid(row=2, column=0, padx=5, pady=5)
-        freq_entry = ttk.Entry(gen_window)
-        freq_entry.grid(row=2, column=1, padx=5, pady=5)
-
-        ttk.Label(gen_window, text="Sampling Frequency (Hz):").grid(row=3, column=0, padx=5, pady=5)
-        sampling_freq_entry = ttk.Entry(gen_window)
-        sampling_freq_entry.grid(row=3, column=1, padx=5, pady=5)
-
-        ttk.Label(gen_window, text="Duration (seconds):").grid(row=4, column=0, padx=5, pady=5)
-        duration_entry = ttk.Entry(gen_window)
-        duration_entry.grid(row=4, column=1, padx=5, pady=5)
-
-        ttk.Button(gen_window, text="Generate", command=perform_generation).grid(row=5, column=0, columnspan=2, pady=10)
-
-# Main function for Task 1 testing
-def main_task1():
-    try:
-        # Read Signal1 and Signal2
-        signal1 = Signal.from_file('Signal1.txt')
-        signal2 = Signal.from_file('Signal2.txt')
-    except Exception as e:
-        print(f"Error reading signal files: {e}")
-        return
-
-    # Perform Addition
-    print("Testing Addition:")
-    added_signal = SignalOperations.add(signal1, signal2)
-    AddSignalSamplesAreEqual("Signal1.txt", "Signal2.txt", added_signal.indices, added_signal.samples)
-
-    # Perform Subtraction
-    print("\nTesting Subtraction:")
-    subtracted_signal = SignalOperations.subtract(signal1, signal2)
-    SubSignalSamplesAreEqual("Signal1.txt", "Signal2.txt", subtracted_signal.indices, subtracted_signal.samples)
-
-    # Perform Multiplication by 5
-    print("\nTesting Multiplication by 5:")
-    multiplied_signal = SignalOperations.multiply(signal1, 5)
-    MultiplySignalByConst(5, multiplied_signal.indices, multiplied_signal.samples)
-
-    # Perform Shift by +3 (Advance)
-    print("\nTesting Shift by +3 (Advance):")
-    shifted_signal = SignalOperations.shift(signal1, 3)
-    ShiftSignalByConst(3, shifted_signal.indices, shifted_signal.samples)
-
-    # Perform Shift by +3 (Advance)
-    print("\nTesting Shift by -3 (Delay):")
-    shifted_signal = SignalOperations.shift(signal1, 3)
-    ShiftSignalByConst(3, shifted_signal.indices, shifted_signal.samples)
-
-    # Perform Folding
-    print("\nTesting Folding:")
-    folded_signal = SignalOperations.fold(signal1)
-    Folding(folded_signal.indices, folded_signal.samples)
-
+        self.task1_ax.set_xlabel("n")
+        self.task1_ax.set_ylabel("Amplitude")
+        self.task1_ax.set_title("Signal Visualization")
+        self.task1_ax.legend()
+        self.task1_ax.grid(True)
+        self.task1_canvas.draw()
 
 if __name__ == "__main__":
-    # Uncomment the following line to run Task 1 tests
-    # main_task1()
-
-    # Run the GUI application for Task 2
     root = tk.Tk()
     app = SignalProcessingApp(root)
     root.mainloop()
