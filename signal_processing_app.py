@@ -118,6 +118,54 @@ class SignalOperations:
         folded_indices = list(reversed([-idx for idx in signal.indices]))
         folded_samples = list(reversed(signal.samples))
         return Signal(folded_indices, folded_samples)
+    
+    # Task 4: Moving Average + First Derivative + Second Derivative + Convolution
+    @staticmethod
+    def moving_average(signal, window_size):
+        n_samples = len(signal.samples)
+        if n_samples < window_size:
+            return Signal([], [])
+        indices = signal.indices[:n_samples - window_size + 1]
+        samples = []
+        for i in range(n_samples - window_size + 1):
+            avg = sum(signal.samples[i:i + window_size]) / window_size
+            samples.append(avg)
+        return Signal(indices, samples)
+
+    @staticmethod
+    def first_derivative(signal):
+        indices = signal.indices[:-1]
+        samples = []
+        for i in range(len(signal.samples) - 1):
+            derivative = signal.samples[i + 1] - signal.samples[i]
+            samples.append(derivative)
+        return Signal(indices, samples)
+
+    @staticmethod
+    def second_derivative(signal):
+        indices = signal.indices[:-2]
+        samples = []
+        for i in range(len(signal.samples) - 2):
+            derivative = signal.samples[i + 2] - 2 * signal.samples[i + 1] + signal.samples[i]
+            samples.append(derivative)
+        return Signal(indices, samples)
+
+    @staticmethod
+    def convolve(signal1, signal2):
+        x = signal1.samples
+        h = signal2.samples
+        y_length = len(x) + len(h) - 1
+        y = [0] * y_length
+        for i in range(len(x)):
+            for j in range(len(h)):
+                y[i + j] += x[i] * h[j]
+        # Compute the indices for the convolution result
+        start_index = signal1.indices[0] + signal2.indices[0]
+        indices = [start_index + i for i in range(y_length)]
+        return Signal(indices, y)
+
+    
+
 
 # Signal Processing App with GUI
 class SignalProcessingApp:
@@ -137,16 +185,19 @@ class SignalProcessingApp:
         task1_frame = ttk.Frame(notebook)
         task2_frame = ttk.Frame(notebook)
         task3_frame = ttk.Frame(notebook)
+        task4_frame = ttk.Frame(notebook)
 
         # Add tabs to notebook
         notebook.add(task1_frame, text='Task 1 - Signal Operations')
         notebook.add(task2_frame, text='Task 2 - Signal Generation')
         notebook.add(task3_frame, text='Task 3 - Quantization')
+        notebook.add(task4_frame, text='Task 4 - Advanced Operations')
 
         # Create widgets for each task
         self.create_task1_widgets(task1_frame)
         self.create_task2_widgets(task2_frame)
         self.create_task3_widgets(task3_frame)
+        self.create_task4_widgets(task4_frame)
 
     # Task 1 Widgets
     def create_task1_widgets(self, frame):
@@ -428,6 +479,168 @@ class SignalProcessingApp:
 
         except ValueError:
             messagebox.showerror("Error", "Please enter valid integer values for levels or bits.")
+    
+    # Task 4: Moving Average Widgets
+    def create_task4_widgets(self, frame):
+        # Frame for operation selection
+        operations_frame = ttk.LabelFrame(frame, text="Select Operation")
+        operations_frame.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
+
+        # Operation Selection
+        self.task4_operation = tk.StringVar(value='moving_average')
+        ttk.Radiobutton(operations_frame, text="Moving Average", variable=self.task4_operation, value='moving_average').grid(row=0, column=0, padx=5, pady=5)
+        ttk.Radiobutton(operations_frame, text="First Derivative", variable=self.task4_operation, value='first_derivative').grid(row=0, column=1, padx=5, pady=5)
+        ttk.Radiobutton(operations_frame, text="Second Derivative", variable=self.task4_operation, value='second_derivative').grid(row=0, column=2, padx=5, pady=5)
+        ttk.Radiobutton(operations_frame, text="Convolution", variable=self.task4_operation, value='convolution').grid(row=0, column=3, padx=5, pady=5)
+
+        # Load Signal Buttons
+        ttk.Button(operations_frame, text="Select Signal", command=self.load_task4_signal).grid(row=1, column=0, padx=5, pady=5)
+
+        self.window_size_entry = None  # Placeholder for window size entry
+
+        # Additional parameter input
+        def update_parameters(*args):
+            # Clear previous parameter inputs
+            for widget in operations_frame.grid_slaves(row=2):
+                widget.destroy()
+            if self.task4_operation.get() == 'moving_average':
+                ttk.Label(operations_frame, text="Window Size:").grid(row=2, column=0, padx=5, pady=5)
+                self.window_size_entry = ttk.Entry(operations_frame)
+                self.window_size_entry.grid(row=2, column=1, padx=5, pady=5)
+            elif self.task4_operation.get() == 'convolution':
+                ttk.Button(operations_frame, text="Select Second Signal", command=self.load_task4_signal2).grid(row=2, column=0, padx=5, pady=5)
+
+        self.task4_operation.trace('w', update_parameters)
+
+        # Compute Button
+        ttk.Button(operations_frame, text="Compute", command=self.compute_task4_operation).grid(row=3, column=0, columnspan=4, pady=10)
+
+        # Plot Frame
+        plot_frame = ttk.Frame(frame)
+        plot_frame.grid(row=1, column=0, padx=10, pady=10)
+
+        self.task4_figure, self.task4_ax = plt.subplots(figsize=(8,6))
+        self.task4_canvas = FigureCanvasTkAgg(self.task4_figure, master=plot_frame)
+        self.task4_canvas.draw()
+        self.task4_canvas.get_tk_widget().pack()
+
+    def load_task4_signal(self):
+        # Allow user to select from existing signals
+        signal_names = list(self.signals.keys())
+        if signal_names:
+            def select_signal():
+                selected = signal_listbox.curselection()
+                if selected:
+                    index = selected[0]
+                    signal_name = signal_names[index]
+                    self.task4_signal = self.signals[signal_name]
+                    messagebox.showinfo("Success", f"Signal '{signal_name}' selected.")
+                    select_window.destroy()
+                else:
+                    messagebox.showwarning("Warning", "Please select a signal.")
+            
+            select_window = tk.Toplevel(self.root)
+            select_window.title("Select Signal")
+            ttk.Label(select_window, text="Select Signal:").pack(padx=5, pady=5)
+            signal_listbox = tk.Listbox(select_window)
+            signal_listbox.pack(padx=5, pady=5)
+            for name in signal_names:
+                signal_listbox.insert(tk.END, name)
+            ttk.Button(select_window, text="Select", command=select_signal).pack(pady=5)
+
+        else:
+            messagebox.showwarning("Warning", "No signals available. Please generate or load a signal first.")
+
+    def load_task4_signal2(self):
+        # Allow user to select the second signal for convolution
+        signal_names = list(self.signals.keys())
+        if signal_names:
+            def select_signal():
+                selected = signal_listbox.curselection()
+                if selected:
+                    index = selected[0]
+                    signal_name = signal_names[index]
+                    self.task4_signal2 = self.signals[signal_name]
+                    messagebox.showinfo("Success", f"Signal '{signal_name}' selected as second signal.")
+                    select_window.destroy()
+                else:
+                    messagebox.showwarning("Warning", "Please select a signal.")
+            
+            select_window = tk.Toplevel(self.root)
+            select_window.title("Select Second Signal")
+            ttk.Label(select_window, text="Select Second Signal:").pack(padx=5, pady=5)
+            signal_listbox = tk.Listbox(select_window)
+            signal_listbox.pack(padx=5, pady=5)
+            for name in signal_names:
+                signal_listbox.insert(tk.END, name)
+            ttk.Button(select_window, text="Select", command=select_signal).pack(pady=5)
+
+        else:
+            messagebox.showwarning("Warning", "No signals available. Please generate or load a signal first.")
+
+    def compute_task4_operation(self):
+        operation = self.task4_operation.get()
+        if not hasattr(self, 'task4_signal'):
+            messagebox.showwarning("Warning", "Please select a signal.")
+            return
+
+        signal = self.task4_signal
+
+        if operation == 'moving_average':
+            if not self.window_size_entry:
+                messagebox.showerror("Error", "Window size entry not found.")
+                return
+            window_size_str = self.window_size_entry.get()
+            try:
+                window_size = int(window_size_str)
+                if window_size < 1:
+                    messagebox.showerror("Error", "Window size must be at least 1.")
+                    return
+                if window_size > len(signal.samples):
+                    messagebox.showerror("Error", "Window size cannot be larger than the number of samples.")
+                    return
+                result_signal = SignalOperations.moving_average(signal, window_size)
+                name = f"Moving_Average_{window_size}_{len(self.signals)+1}"
+                self.signals[name] = result_signal
+                messagebox.showinfo("Success", f"Moving average computed successfully as '{name}'.")
+            except ValueError:
+                messagebox.showerror("Error", "Please enter a valid integer for window size.")
+                return
+        elif operation == 'first_derivative':
+            result_signal = SignalOperations.first_derivative(signal)
+            name = f"First_Derivative_{len(self.signals)+1}"
+            self.signals[name] = result_signal
+            messagebox.showinfo("Success", f"First derivative computed successfully as '{name}'.")
+        elif operation == 'second_derivative':
+            result_signal = SignalOperations.second_derivative(signal)
+            name = f"Second_Derivative_{len(self.signals)+1}"
+            self.signals[name] = result_signal
+            messagebox.showinfo("Success", f"Second derivative computed successfully as '{name}'.")
+        elif operation == 'convolution':
+            if not hasattr(self, 'task4_signal2'):
+                messagebox.showwarning("Warning", "Please select the second signal for convolution.")
+                return
+            signal2 = self.task4_signal2
+            result_signal = SignalOperations.convolve(signal, signal2)
+            name = f"Convolution_{len(self.signals)+1}"
+            self.signals[name] = result_signal
+            messagebox.showinfo("Success", f"Convolution computed successfully as '{name}'.")
+        else:
+            messagebox.showerror("Error", "Unknown operation.")
+            return
+
+        # Plot result
+        self.task4_ax.clear()
+        indices = result_signal.indices
+        samples = result_signal.samples
+        self.task4_ax.plot(indices, samples, label=name)
+        self.task4_ax.set_xlabel('Sample Index')
+        self.task4_ax.set_ylabel('Amplitude')
+        self.task4_ax.set_title(f"Result of {operation.replace('_', ' ').capitalize()}")
+        self.task4_ax.legend()
+        self.task4_ax.grid(True)
+        self.task4_canvas.draw()
+
 
     # Existing methods for Task 1
     def load_signal(self, signal_number):
@@ -551,7 +764,69 @@ class SignalProcessingApp:
         self.task1_ax.grid(True)
         self.task1_canvas.draw()
 
+def compare_signals(signal1, signal2, tolerance=1e-3):
+    if signal1.indices != signal2.indices:
+        return False
+    for s1, s2 in zip(signal1.samples, signal2.samples):
+        if abs(s1 - s2) > tolerance:
+            return False
+    return True
+
+# Test Functions
+def test_convolution():
+    signal1 = Signal.from_file('Signal 1.txt')
+    signal2 = Signal.from_file('Signal 2.txt')
+    expected_output = Signal.from_file('Conv_output.txt')
+
+    result_signal = SignalOperations.convolve(signal1, signal2)
+    if compare_signals(result_signal, expected_output):
+        print("Convolution Test Passed")
+    else:
+        print("Convolution Test Failed")
+
+def test_derivatives():
+    input_signal = Signal.from_file('Derivative_input.txt')
+    expected_first_derivative = Signal.from_file('1st_derivative_out.txt')
+    expected_second_derivative = Signal.from_file('2nd_derivative_out.txt')
+
+    first_derivative = SignalOperations.first_derivative(input_signal)
+    second_derivative = SignalOperations.second_derivative(input_signal)
+
+    if compare_signals(first_derivative, expected_first_derivative):
+        print("First Derivative Test Passed")
+    else:
+        print("First Derivative Test Failed")
+
+    if compare_signals(second_derivative, expected_second_derivative):
+        print("Second Derivative Test Passed")
+    else:
+        print("Second Derivative Test Failed")
+
+def test_moving_average():
+    input_signal = Signal.from_file('MovingAvg_input.txt')
+
+    # Test 1: Window size = 3
+    expected_output1 = Signal.from_file('MovingAvg_out1.txt')
+    moving_avg1 = SignalOperations.moving_average(input_signal, window_size=3)
+    if compare_signals(moving_avg1, expected_output1):
+        print("Moving Average Test 1 Passed")
+    else:
+        print("Moving Average Test 1 Failed")
+
+    # Test 2: Window size = 5
+    expected_output2 = Signal.from_file('MovingAvg_out2.txt')
+    moving_avg2 = SignalOperations.moving_average(input_signal, window_size=5)
+    if compare_signals(moving_avg2, expected_output2):
+        print("Moving Average Test 2 Passed")
+    else:
+        print("Moving Average Test 2 Failed")
+
+
+
 if __name__ == "__main__":
+    # test_convolution()
+    # test_derivatives()
+    # test_moving_average()
     root = tk.Tk()
     app = SignalProcessingApp(root)
     root.mainloop()
