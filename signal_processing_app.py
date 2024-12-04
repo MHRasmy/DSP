@@ -8,9 +8,10 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
 # Signal Class
 class Signal:
-    def __init__(self, indices=None, samples=None):
+    def __init__(self, indices=None, samples=None, time_values=None):
         self.indices = indices if indices is not None else []
         self.samples = samples if samples is not None else []
+        self.time_values = time_values if time_values is not None else []
 
     @classmethod
     def from_file(cls, file_path):
@@ -55,7 +56,7 @@ class Signal:
         t = np.arange(N) / sampling_freq  # Time vector
         samples = amplitude * np.sin(2 * np.pi * frequency * t + phase_shift)
         indices = list(range(N))
-        return cls(indices, samples.tolist())
+        return cls(indices, samples.tolist(), t.tolist())
 
     @classmethod
     def generate_cosine(cls, amplitude, phase_shift, frequency, sampling_freq):
@@ -63,7 +64,7 @@ class Signal:
         t = np.arange(N) / sampling_freq  # Time vector
         samples = amplitude * np.cos(2 * np.pi * frequency * t + phase_shift)
         indices = list(range(N))
-        return cls(indices, samples.tolist())
+        return cls(indices, samples.tolist(), t.tolist())
 
 # Signal Operations
 class SignalOperations:
@@ -163,9 +164,35 @@ class SignalOperations:
         start_index = signal1.indices[0] + signal2.indices[0]
         indices = [start_index + i for i in range(y_length)]
         return Signal(indices, y)
-
     
+    # Task 5: DFT and IDFT
+    @staticmethod
+    def compute_dft(signal):
+        N = len(signal.samples)
+        X_real = []
+        X_imag = []
+        for k in range(N):
+            real_part = 0
+            imag_part = 0
+            for n in range(N):
+                angle = -2 * math.pi * k * n / N
+                real_part += signal.samples[n] * math.cos(angle)
+                imag_part += signal.samples[n] * math.sin(angle)
+            X_real.append(real_part)
+            X_imag.append(imag_part)
+        return X_real, X_imag
 
+    @staticmethod
+    def compute_idft(X_real, X_imag):
+        N = len(X_real)
+        samples = []
+        for n in range(N):
+            sample = 0
+            for k in range(N):
+                angle = 2 * math.pi * k * n / N
+                sample += X_real[k] * math.cos(angle) - X_imag[k] * math.sin(angle)
+            samples.append(sample / N)
+        return samples
 
 # Signal Processing App with GUI
 class SignalProcessingApp:
@@ -186,18 +213,21 @@ class SignalProcessingApp:
         task2_frame = ttk.Frame(notebook)
         task3_frame = ttk.Frame(notebook)
         task4_frame = ttk.Frame(notebook)
+        task5_frame = ttk.Frame(notebook)
 
         # Add tabs to notebook
         notebook.add(task1_frame, text='Task 1 - Signal Operations')
         notebook.add(task2_frame, text='Task 2 - Signal Generation')
         notebook.add(task3_frame, text='Task 3 - Quantization')
         notebook.add(task4_frame, text='Task 4 - Advanced Operations')
+        notebook.add(task5_frame, text='Task 5 - Fourier Transform')
 
         # Create widgets for each task
         self.create_task1_widgets(task1_frame)
         self.create_task2_widgets(task2_frame)
         self.create_task3_widgets(task3_frame)
         self.create_task4_widgets(task4_frame)
+        self.create_task5_widgets(task5_frame)
 
     # Task 1 Widgets
     def create_task1_widgets(self, frame):
@@ -330,18 +360,18 @@ class SignalProcessingApp:
             # Plot signal
             self.task2_ax.clear()
             representation = self.task2_representation.get()
-            indices = generated_signal.indices
+            time_values = generated_signal.time_values
             samples = generated_signal.samples
 
             if representation == "Continuous":
-                self.task2_ax.plot(indices, samples, label=f'{wave_type.capitalize()} Signal')
+                self.task2_ax.plot(time_values, samples, label=f'{wave_type.capitalize()} Signal')
             else:
                 try:
-                    self.task2_ax.stem(indices, samples, label=f'{wave_type.capitalize()} Signal', use_line_collection=True)
+                    self.task2_ax.stem(time_values, samples, label=f'{wave_type.capitalize()} Signal', use_line_collection=True)
                 except TypeError:
-                    self.task2_ax.stem(indices, samples, label=f'{wave_type.capitalize()} Signal')
+                    self.task2_ax.stem(time_values, samples, label=f'{wave_type.capitalize()} Signal')
 
-            self.task2_ax.set_xlabel('Sample Index')
+            self.task2_ax.set_xlabel('Time (s)')
             self.task2_ax.set_ylabel('Amplitude')
             self.task2_ax.set_title(f"{wave_type.capitalize()} Signal")
             self.task2_ax.legend()
@@ -355,7 +385,6 @@ class SignalProcessingApp:
 
         except ValueError:
             messagebox.showerror("Error", "Please enter valid numerical values.")
-
 
     # Task 3 Widgets
     def create_task3_widgets(self, frame):
@@ -478,9 +507,9 @@ class SignalProcessingApp:
             messagebox.showinfo("Encoded Signal", f"Encoded Levels:\n{encoded_str}")
 
         except ValueError:
-            messagebox.showerror("Error", "Please enter valid integer values for levels or bits.")
+            messagebox.showerror("Error", "Please enter valid integer values for levels or bits")
     
-    # Task 4: Moving Average Widgets
+    # Task 4 Widgets
     def create_task4_widgets(self, frame):
         # Frame for operation selection
         operations_frame = ttk.LabelFrame(frame, text="Select Operation")
@@ -641,6 +670,147 @@ class SignalProcessingApp:
         self.task4_ax.grid(True)
         self.task4_canvas.draw()
 
+    # Task 5 Widgets
+    def create_task5_widgets(self, frame):
+        # Input Frame
+        input_frame = ttk.LabelFrame(frame, text="Fourier Transform")
+        input_frame.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
+
+        # Load Signal Button
+        ttk.Button(input_frame, text="Select Signal", command=self.load_task5_signal).grid(row=0, column=0, padx=5, pady=5)
+
+        # Sampling Frequency Entry
+        ttk.Label(input_frame, text="Sampling Frequency (Hz):").grid(row=1, column=0, padx=5, pady=5)
+        self.sampling_freq_entry_task5 = ttk.Entry(input_frame)
+        self.sampling_freq_entry_task5.grid(row=1, column=1, padx=5, pady=5)
+
+        # Compute DFT Button
+        ttk.Button(input_frame, text="Compute DFT", command=self.compute_dft).grid(row=2, column=0, columnspan=2, pady=10)
+
+        # Compute IDFT Button
+        ttk.Button(input_frame, text="Compute IDFT", command=self.compute_idft).grid(row=3, column=0, columnspan=2, pady=10)
+
+        # Plot Frame for Amplitude and Phase
+        plot_frame = ttk.Frame(frame)
+        plot_frame.grid(row=0, column=1, rowspan=2, padx=10, pady=10)
+
+        self.task5_figure, (self.amplitude_ax, self.phase_ax) = plt.subplots(2, 1, figsize=(8, 8))
+        self.task5_canvas = FigureCanvasTkAgg(self.task5_figure, master=plot_frame)
+        self.task5_canvas.draw()
+        self.task5_canvas.get_tk_widget().pack()
+
+        # Plot Frame for Reconstructed Signal
+        plot_frame_recon = ttk.Frame(frame)
+        plot_frame_recon.grid(row=2, column=0, columnspan=2, padx=10, pady=10)
+
+        self.task5_recon_figure, self.recon_ax = plt.subplots(figsize=(8, 4))
+        self.task5_recon_canvas = FigureCanvasTkAgg(self.task5_recon_figure, master=plot_frame_recon)
+        self.task5_recon_canvas.draw()
+        self.task5_recon_canvas.get_tk_widget().pack()
+
+    def load_task5_signal(self):
+        # Allow user to select from existing signals
+        signal_names = list(self.signals.keys())
+        if signal_names:
+            def select_signal():
+                selected = signal_listbox.curselection()
+                if selected:
+                    index = selected[0]
+                    signal_name = signal_names[index]
+                    self.task5_signal = self.signals[signal_name]
+                    messagebox.showinfo("Success", f"Signal '{signal_name}' selected for DFT.")
+                    select_window.destroy()
+                else:
+                    messagebox.showwarning("Warning", "Please select a signal.")
+            
+            select_window = tk.Toplevel(self.root)
+            select_window.title("Select Signal for DFT")
+            ttk.Label(select_window, text="Select Signal:").pack(padx=5, pady=5)
+            signal_listbox = tk.Listbox(select_window)
+            signal_listbox.pack(padx=5, pady=5)
+            for name in signal_names:
+                signal_listbox.insert(tk.END, name)
+            ttk.Button(select_window, text="Select", command=select_signal).pack(pady=5)
+        else:
+            messagebox.showwarning("Warning", "No signals available. Please generate or load a signal first.")
+
+    def compute_dft(self):
+        if not hasattr(self, 'task5_signal'):
+            messagebox.showwarning("Warning", "Please select a signal for DFT.")
+            return
+
+        sampling_freq_str = self.sampling_freq_entry_task5.get()
+        try:
+            sampling_freq = float(sampling_freq_str)
+        except ValueError:
+            messagebox.showerror("Error", "Please enter a valid sampling frequency.")
+            return
+
+        signal = self.task5_signal
+        N = len(signal.samples)
+        X_real, X_imag = SignalOperations.compute_dft(signal)
+
+        # Compute amplitude and phase spectra
+        amplitudes = [math.sqrt(r**2 + im**2) for r, im in zip(X_real, X_imag)]
+        phases = [math.atan2(im, r) for r, im in zip(X_real, X_imag)]
+
+        # Frequency bins
+        freqs = [sampling_freq * k / N for k in range(N)]
+
+        # Plot amplitude spectrum
+        self.amplitude_ax.clear()
+        try:
+            self.amplitude_ax.stem(freqs, amplitudes, use_line_collection=True)
+        except TypeError:
+            self.amplitude_ax.stem(freqs, amplitudes)
+        self.amplitude_ax.set_xlabel('Frequency (Hz)')
+        self.amplitude_ax.set_ylabel('Amplitude')
+        self.amplitude_ax.set_title('Amplitude Spectrum')
+        self.amplitude_ax.grid(True)
+
+        # Plot phase spectrum
+        self.phase_ax.clear()
+        try:
+            self.phase_ax.stem(freqs, phases, use_line_collection=True)
+        except TypeError:
+            self.phase_ax.stem(freqs, phases)
+        self.phase_ax.set_xlabel('Frequency (Hz)')
+        self.phase_ax.set_ylabel('Phase (Radians)')
+        self.phase_ax.set_title('Phase Spectrum')
+        self.phase_ax.grid(True)
+
+        self.task5_canvas.draw()
+
+        # Store DFT components for IDFT
+        self.X_real = X_real
+        self.X_imag = X_imag
+        self.N = N
+        self.sampling_freq = sampling_freq
+
+
+    def compute_idft(self):
+        if not hasattr(self, 'X_real') or not hasattr(self, 'X_imag'):
+            messagebox.showwarning("Warning", "Please compute DFT first.")
+            return
+
+        reconstructed_samples = SignalOperations.compute_idft(self.X_real, self.X_imag)
+
+        # Plot reconstructed signal
+        self.recon_ax.clear()
+        time_axis = [n / self.sampling_freq for n in range(self.N)]
+        self.recon_ax.plot(time_axis, reconstructed_samples, label='Reconstructed Signal')
+        self.recon_ax.set_xlabel('Time (s)')
+        self.recon_ax.set_ylabel('Amplitude')
+        self.recon_ax.set_title('Reconstructed Signal via IDFT')
+        self.recon_ax.legend()
+        self.recon_ax.grid(True)
+        self.task5_recon_canvas.draw()
+
+        # Store reconstructed signal
+        name = f"Reconstructed_Signal_{len(self.signals)+1}"
+        indices = list(range(self.N))
+        self.signals[name] = Signal(indices, reconstructed_samples)
+        messagebox.showinfo("Success", f"Signal reconstructed successfully as '{name}'.")
 
     # Existing methods for Task 1
     def load_signal(self, signal_number):
@@ -772,61 +942,78 @@ def compare_signals(signal1, signal2, tolerance=1e-3):
             return False
     return True
 
+# Compare functions for DFT amplitudes and phases
+def SignalComapreAmplitude(SignalInput=[], SignalOutput=[], tolerance=1e-3):
+    if len(SignalInput) != len(SignalOutput):
+        return False
+    for i in range(len(SignalInput)):
+        if abs(SignalInput[i] - SignalOutput[i]) > tolerance:
+            return False
+    return True
+
+
+def SignalComaprePhaseShift(SignalInput=[], SignalOutput=[], tolerance=1e-3):
+    if len(SignalInput) != len(SignalOutput):
+        return False
+    for i in range(len(SignalInput)):
+        # Normalize phases to the range [-π, π]
+        A = ((SignalInput[i] + math.pi) % (2 * math.pi)) - math.pi
+        B = ((SignalOutput[i] + math.pi) % (2 * math.pi)) - math.pi
+        if abs(A - B) > tolerance:
+            return False
+    return True
+
+
+def read_dft_output(file_path):
+    amplitudes = []
+    phases = []
+    with open(file_path, 'r') as f:
+        lines = f.readlines()
+        N = int(lines[2].strip())  # Number of samples
+        for line in lines[3:3+N]:
+            parts = line.strip().split()
+            amplitude = float(parts[0])
+            phase = float(parts[1].replace('f', ''))
+            amplitudes.append(amplitude)
+            phases.append(phase)
+    return amplitudes, phases
+
 # Test Functions
-def test_convolution():
-    signal1 = Signal.from_file('Signal 1.txt')
-    signal2 = Signal.from_file('Signal 2.txt')
-    expected_output = Signal.from_file('Conv_output.txt')
+def test_dft_idft():
+    input_signal = Signal.from_file('input_Signal_DFT.txt')
+    expected_amplitudes, expected_phases = read_dft_output('Output_Signal_DFT_A,Phase.txt')
 
-    result_signal = SignalOperations.convolve(signal1, signal2)
-    if compare_signals(result_signal, expected_output):
-        print("Convolution Test Passed")
+    X_real, X_imag = SignalOperations.compute_dft(input_signal)
+
+    # Compute amplitude and phase
+    amplitudes = [math.sqrt(r**2 + im**2) for r, im in zip(X_real, X_imag)]
+    phases = [math.atan2(im, r) for r, im in zip(X_real, X_imag)]
+
+
+    # Compare amplitudes and phases
+    amplitude_match = SignalComapreAmplitude(amplitudes, expected_amplitudes)
+    phase_match = SignalComaprePhaseShift(phases, expected_phases)
+
+    if amplitude_match and phase_match:
+        print("DFT Test Passed")
     else:
-        print("Convolution Test Failed")
+        print("DFT Test Failed")
 
-def test_derivatives():
-    input_signal = Signal.from_file('Derivative_input.txt')
-    expected_first_derivative = Signal.from_file('1st_derivative_out.txt')
-    expected_second_derivative = Signal.from_file('2nd_derivative_out.txt')
+    # Test IDFT
+    reconstructed_samples = SignalOperations.compute_idft(X_real, X_imag)
+    reconstructed_signal = Signal(input_signal.indices, reconstructed_samples)
 
-    first_derivative = SignalOperations.first_derivative(input_signal)
-    second_derivative = SignalOperations.second_derivative(input_signal)
-
-    if compare_signals(first_derivative, expected_first_derivative):
-        print("First Derivative Test Passed")
+    # Compare reconstructed signal with original
+    if compare_signals(input_signal, reconstructed_signal):
+        print("IDFT Test Passed")
     else:
-        print("First Derivative Test Failed")
-
-    if compare_signals(second_derivative, expected_second_derivative):
-        print("Second Derivative Test Passed")
-    else:
-        print("Second Derivative Test Failed")
-
-def test_moving_average():
-    input_signal = Signal.from_file('MovingAvg_input.txt')
-
-    # Test 1: Window size = 3
-    expected_output1 = Signal.from_file('MovingAvg_out1.txt')
-    moving_avg1 = SignalOperations.moving_average(input_signal, window_size=3)
-    if compare_signals(moving_avg1, expected_output1):
-        print("Moving Average Test 1 Passed")
-    else:
-        print("Moving Average Test 1 Failed")
-
-    # Test 2: Window size = 5
-    expected_output2 = Signal.from_file('MovingAvg_out2.txt')
-    moving_avg2 = SignalOperations.moving_average(input_signal, window_size=5)
-    if compare_signals(moving_avg2, expected_output2):
-        print("Moving Average Test 2 Passed")
-    else:
-        print("Moving Average Test 2 Failed")
-
+        print("IDFT Test Failed")
 
 
 if __name__ == "__main__":
-    # test_convolution()
-    # test_derivatives()
-    # test_moving_average()
+    # Run tests
+    # test_dft_idft()
+    # Start the GUI
     root = tk.Tk()
     app = SignalProcessingApp(root)
     root.mainloop()
