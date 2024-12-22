@@ -235,9 +235,6 @@ class SignalOperations:
 
     @staticmethod
     def time_delay_from_correlation(corr_signal):
-        """
-        Finds the lag at which correlation is maximum in absolute value.
-        """
         samples = corr_signal.samples
         indices = corr_signal.indices
         max_val = max(samples, key=abs)
@@ -247,14 +244,6 @@ class SignalOperations:
 
     @staticmethod
     def classify_signal_by_correlation(signal_to_classify, classA_template, classB_template):
-        """
-        Using correlation-based classification:
-          1) Correlate the input signal with classA_template => max corr_A
-          2) Correlate the input signal with classB_template => max corr_B
-          3) Compare average of those max correlation values with a threshold
-             (or simply decide if max corr_A > max corr_B => Class A, else Class B).
-        This is a placeholder approach; the exact classification depends on your lab instructions.
-        """
         corrA = SignalOperations.correlate(signal_to_classify, classA_template)
         corrB = SignalOperations.correlate(signal_to_classify, classB_template)
 
@@ -272,110 +261,116 @@ class SignalOperations:
     # -----------------------------
     @staticmethod
     def design_fir_filter(filter_specs):
-        """
-        filter_specs is a dictionary that might have:
-          {
-            'FilterType': 'Low pass' | 'High pass' | 'Band pass' | 'Band stop',
-            'FS': <float>,
-            'StopBandAttenuation': <float>,
-            'FC': <float> or 'F1': <float>, 'F2': <float>,
-            'TransitionBand': <float>,
-            ...
-          }
-        Return the computed FIR filter h(n) as a Signal object with symmetrical indices.
-        """
-        # We'll do a minimal window-based approach.
+        # Extract filter specifications
         ftype = filter_specs.get('FilterType', 'Low pass').lower()
         fs = float(filter_specs.get('FS', 8000))
         A_s = float(filter_specs.get('StopBandAttenuation', 50))
         # For low/high pass => 'FC' in specs
         # For band pass/stop => 'F1' and 'F2'
 
-        # 1) Compute normalized frequencies
-        if ftype in ['low pass', 'high pass']:
-            fc = float(filter_specs.get('FC', 1500))
-            trans = float(filter_specs.get('TransitionBand', 500))
-            # Adjust for transition: e.g. fc' = fc ± trans/2 for certain implementations
-            # We'll do a simplified approach.
-            # For demonstration:
-            delta_f = trans
-            # Compute normalized frequencies:
-            wc = (2 * math.pi) * (fc / fs)
+        # Define window methods in order with their Transition Width constants and StopBandAttenuation
+        window_methods = [
+            ('Rectangular', 0.9, 21, lambda n, N: 1.0),  # #CHANGE: Added transition_width_const and adjusted window_func to use N
+            ('Hanning', 3.1, 44, lambda n, N: 0.5 + 0.5 * math.cos(2 * math.pi * n / N)),  # #CHANGE
+            ('Hamming', 3.3, 53, lambda n, N: 0.54 + 0.46 * math.cos(2 * math.pi * n / N)),  # #CHANGE
+            ('Blackman', 5.5, 74, lambda n, N: 0.42 + 0.5 * math.cos(2 * math.pi * n / N-1) + 0.08 * math.cos(4 * math.pi * n / N-1))  # #CHANGE
+        ]
+
+        # Select window method based on StopBandAttenuation
+        selected_window = None
+        for name, transition_width_const, attenuation, window_func in window_methods:  # #CHANGE: Unpacked transition_width_const
+            if attenuation >= A_s:
+                selected_window = (name, transition_width_const, attenuation, window_func)
+                break
+        if not selected_window:
+            # If none satisfy, choose the one with the highest attenuation
+            selected_window = window_methods[-1]  # Blackman
+            name, transition_width_const, attenuation, window_func = selected_window
+            print(f"No window satisfies the StopBandAttenuation >= {A_s}. Selected {name} window with attenuation {attenuation} dB.")  # #CHANGE
         else:
+            name, transition_width_const, attenuation, window_func = selected_window  # #CHANGE
+
+        # Now, proceed with filter design using the selected window
+        # 1) Compute normalized transition width
+        trans = float(filter_specs.get('TransitionBand', 500))  # Transition width in Hz
+        delta_f_normalized = trans / fs  # Normalized transition width
+        # Calculate filter order (N) based on window method's transition width formula
+        # From the table: Transition Width = transition_width_const / N => N = transition_width_const / delta_f_normalized
+        N_approx = transition_width_const / delta_f_normalized  # #CHANGE
+        N = int(math.ceil(N_approx))  # #CHANGE
+        if N % 2 == 0:
+            N += 1  # Ensure it's odd
+        # Enforce a minimum order if necessary
+        N = max(N, 3)  # #CHANGE
+        print(f"Selected Window: {name}, Transition Width Const: {transition_width_const}, Transition Width Normalized: {delta_f_normalized}, Calculated N: {N}")  # #CHANGE
+
+        # 2) Adjust cutoff frequencies to center the transition
+        if ftype == 'low pass':
+            # For Low-Pass: f_c' = f_p + Delta_f / 2
+            f_p = float(filter_specs.get('FC', 1500))
+            f_c_prime = f_p + (trans / 2)  # #CHANGE
+            fc_prime_normalized = f_c_prime / fs  # Normalized
+            wc = 2 * math.pi * fc_prime_normalized  # #CHANGE
+        elif ftype == 'high pass':
+            # For High-Pass: f_c' = f_p - Delta_f / 2
+            f_p = float(filter_specs.get('FC', 1500))
+            f_c_prime = f_p - (trans / 2)  # #CHANGE
+            fc_prime_normalized = f_c_prime / fs  # Normalized
+            wc = 2 * math.pi * fc_prime_normalized  # #CHANGE
+        elif ftype == 'band pass':
+            # For Band-Pass: f1' = f1 - Delta_f / 2, f2' = f2 + Delta_f / 2
             f1 = float(filter_specs.get('F1', 150))
             f2 = float(filter_specs.get('F2', 250))
-            trans = float(filter_specs.get('TransitionBand', 50))
-            delta_f = trans
-            w1 = (2 * math.pi) * (f1 / fs)
-            w2 = (2 * math.pi) * (f2 / fs)
-
-        # 2) Compute filter order (N) using formula based on A_s, delta_f
-        # This is a typical approximation. For better accuracy, apply Kaiser or other methods.
-        # We'll do a placeholder approach:
-        # For example, we might do:
-        if A_s <= 21:
-            alpha = 0
-        elif A_s <= 50:
-            alpha = 0.5842 * (A_s - 21) ** 0.4 + 0.07886 * (A_s - 21)
+            f1_prime = f1 - (trans / 2)  # #CHANGE
+            f2_prime = f2 + (trans / 2)  # #CHANGE
+            w1 = 2 * math.pi * (f1_prime / fs)  # #CHANGE
+            w2 = 2 * math.pi * (f2_prime / fs)  # #CHANGE
+        elif ftype == 'band stop':
+            # For Band-Stop: f1' = f1 + Delta_f / 2, f2' = f2 - Delta_f / 2
+            f1 = float(filter_specs.get('F1', 150))
+            f2 = float(filter_specs.get('F2', 250))
+            f1_prime = f1 + (trans / 2)  # #CHANGE
+            f2_prime = f2 - (trans / 2)  # #CHANGE
+            w1 = 2 * math.pi * (f1_prime / fs)  # #CHANGE
+            w2 = 2 * math.pi * (f2_prime / fs)  # #CHANGE
         else:
-            alpha = 0.1102 * (A_s - 8.7)
-
-        # Approx for Kaiser window (Delta_f in Hz => normalized is delta_f/fs)
-        d_f_normalized = delta_f / fs
-        # Typical formula: N ~ (A_s - 8) / (2.285 * 2*pi* d_f_normalized) but let's simplify
-        # We'll do a rough approach:
-        N_approx = (A_s - 8.0) / (2.285 * 2 * math.pi * d_f_normalized)
-        N = int(np.ceil(N_approx))
-        if (N % 2) == 0:
-            N += 1  # Ensure it's odd
+            raise ValueError("Unsupported Filter Type")
 
         # 3) Compute ideal filter hd(n):
-        #    For low pass:
-        #       hd(n) = wc/pi * sinc(...)
-        #    For high pass:
-        #       hd(n) = ...
-        #    For band pass:
-        #       ...
-        # We'll create a symmetrical index: from -M to +M, where M = (N-1)//2
         M = (N - 1) // 2
         hd = []
         for n in range(-M, M + 1):
             if ftype == 'low pass':
-                # ideal LPF: sin(wc * n) / (pi * n)
                 if n == 0:
-                    val = wc / math.pi  # since sin(0)/0 => limit
+                    val = wc / math.pi
                 else:
                     val = math.sin(wc * n) / (math.pi * n)
                 hd.append(val)
             elif ftype == 'high pass':
-                # ideal HPF: delta(n) - LPF => or sin(pi*n) - sin(wc*n) / pi*n
-                # Simplify the standard formula: h_hp(n) = (-1)^n * h_lp(n) (for zero-phase)
                 if n == 0:
-                    val = 1.0 - ( (2 * fc) / fs )  # or (math.pi - wc)/ math.pi
+                    val = 1 - wc / math.pi
                 else:
-                    val = - (math.sin(wc * n) / (math.pi * n))
+                    val = -math.sin(wc * n) / (math.pi * n)
                 hd.append(val)
             elif ftype == 'band pass':
-                # ideal BPF: h_bpf(n) = [ sin(w2*n) - sin(w1*n ) ] / (pi*n)
                 if n == 0:
                     val = (w2 - w1) / math.pi
                 else:
                     val = (math.sin(w2 * n) - math.sin(w1 * n)) / (math.pi * n)
                 hd.append(val)
-            else:
-                # band stop: h_bsf(n) = delta(n) - bandpass
-                # or h_bsf(n) = h_lp(fc1) + h_hp(fc2) ...
+            elif ftype == 'band stop':
                 if n == 0:
-                    val = 1.0 - ( (w2 - w1) / math.pi )
+                    val = 1 - (w2 - w1) / math.pi
                 else:
                     val = - (math.sin(w2 * n) - math.sin(w1 * n)) / (math.pi * n)
                 hd.append(val)
+            else:
+                raise ValueError("Unknown Filter Type")
 
-        # 4) Compute window w(n). For simplicity, let's do a simple Hamming window.
-        #   w[n] = 0.54 - 0.46 cos(2*pi*n / (N-1))
+        # 4) Compute window w(n) using the selected window function
         w = []
         for i, n in enumerate(range(-M, M + 1)):
-            wval = 0.54 - 0.46 * math.cos(2 * math.pi * (i) / (N - 1))
+            wval = window_func(n, N)  # #CHANGE: pass N, not M
             w.append(wval)
 
         # 5) Multiply hd(n) * w(n) => h(n)
