@@ -435,6 +435,7 @@ class SignalProcessingApp:
         task5_frame = ttk.Frame(notebook)
         taskA_frame = ttk.Frame(notebook)
         taskB_frame = ttk.Frame(notebook)
+        bonus_frame = ttk.Frame(notebook)
 
         notebook.add(task1_frame, text='Task 1 - Signal Operations')
         notebook.add(task2_frame, text='Task 2 - Signal Generation')
@@ -444,6 +445,8 @@ class SignalProcessingApp:
         # New Tabs
         notebook.add(taskA_frame, text='Task A - Correlation')
         notebook.add(taskB_frame, text='Task B - Filtering')
+        # New Bonus Task Tab
+        notebook.add(bonus_frame, text='Bonus Task - Detection in Noise')
 
         self.create_task1_widgets(task1_frame)
         self.create_task2_widgets(task2_frame)
@@ -452,6 +455,8 @@ class SignalProcessingApp:
         self.create_task5_widgets(task5_frame)
         self.create_taskA_widgets(taskA_frame)
         self.create_taskB_widgets(taskB_frame)
+        self.create_bonus_widgets(bonus_frame)
+
 
     # Task 1 Widgets
     def create_task1_widgets(self, frame):
@@ -1341,6 +1346,262 @@ class SignalProcessingApp:
         self.task1_ax.legend()
         self.task1_ax.grid(True)
         self.task1_canvas.draw()
+
+    # Bonus Widget
+    def create_bonus_widgets(self, frame):
+        # Input Frame
+        input_frame = ttk.LabelFrame(frame, text="Sine Wave Parameters")
+        input_frame.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
+
+        # Amplitude Entry
+        ttk.Label(input_frame, text="Amplitude (A):").grid(row=0, column=0, padx=5, pady=5, sticky='e')
+        self.bonus_amplitude_entry = ttk.Entry(input_frame)
+        self.bonus_amplitude_entry.grid(row=0, column=1, padx=5, pady=5)
+
+        # Frequency Entry
+        ttk.Label(input_frame, text="Frequency (Hz):").grid(row=1, column=0, padx=5, pady=5, sticky='e')
+        self.bonus_frequency_entry = ttk.Entry(input_frame)
+        self.bonus_frequency_entry.grid(row=1, column=1, padx=5, pady=5)
+
+        # Phase Shift Entry
+        ttk.Label(input_frame, text="Phase Shift (radians):").grid(row=2, column=0, padx=5, pady=5, sticky='e')
+        self.bonus_phase_entry = ttk.Entry(input_frame)
+        self.bonus_phase_entry.grid(row=2, column=1, padx=5, pady=5)
+
+        # Number of Samples Entry
+        ttk.Label(input_frame, text="Number of Samples:").grid(row=3, column=0, padx=5, pady=5, sticky='e')
+        self.bonus_samples_entry = ttk.Entry(input_frame)
+        self.bonus_samples_entry.grid(row=3, column=1, padx=5, pady=5)
+        self.bonus_samples_entry.insert(0, "100")  # Default to 100 samples
+
+        # Sampling Frequency Entry
+        ttk.Label(input_frame, text="Sampling Frequency (Hz):").grid(row=4, column=0, padx=5, pady=5, sticky='e')
+        self.bonus_sampling_freq_entry = ttk.Entry(input_frame)
+        self.bonus_sampling_freq_entry.grid(row=4, column=1, padx=5, pady=5)
+        self.bonus_sampling_freq_entry.insert(0, "1000")  # Default to 1000 Hz
+
+        # Generate Sine Button
+        generate_sine_btn = ttk.Button(input_frame, text="Generate Sine Wave", command=self.generate_bonus_sine)
+        generate_sine_btn.grid(row=5, column=0, columnspan=2, pady=10)
+
+        # Operations Frame
+        operations_frame = ttk.LabelFrame(frame, text="Operations")
+        operations_frame.grid(row=1, column=0, padx=10, pady=10, sticky="nsew")
+
+        # Autocorrelation Button
+        autocorr_sine_btn = ttk.Button(operations_frame, text="Autocorrelate Sine Wave", command=self.autocorrelate_sine)
+        autocorr_sine_btn.grid(row=0, column=0, padx=5, pady=5)
+
+        # Generate Noise Button
+        generate_noise_btn = ttk.Button(operations_frame, text="Generate AWGN Noise", command=self.generate_bonus_noise)
+        generate_noise_btn.grid(row=0, column=1, padx=5, pady=5)
+
+        # Add Noise Button
+        add_noise_btn = ttk.Button(operations_frame, text="Add Noise to Sine", command=self.add_noise_to_sine)
+        add_noise_btn.grid(row=1, column=0, padx=5, pady=5)
+
+        # Autocorrelation of Corrupted Signal Button
+        autocorr_corrupted_btn = ttk.Button(operations_frame, text="Autocorrelate Corrupted Signal", command=self.autocorrelate_corrupted)
+        autocorr_corrupted_btn.grid(row=1, column=1, padx=5, pady=5)
+
+        # Plot Frame
+        plot_frame = ttk.LabelFrame(frame, text="Plots")
+        plot_frame.grid(row=0, column=1, rowspan=2, padx=10, pady=10, sticky="nsew")
+
+        # Create a grid of subplots: 2 rows x 3 columns
+        self.bonus_figure, self.bonus_axes = plt.subplots(2, 3, figsize=(18, 10))
+        self.bonus_canvas = FigureCanvasTkAgg(self.bonus_figure, master=plot_frame)
+        self.bonus_canvas.draw()
+        self.bonus_canvas.get_tk_widget().pack()
+
+        # Initialize storage for signals
+        self.bonus_signals = {}
+
+    def generate_bonus_sine(self):
+        try:
+            amplitude = float(self.bonus_amplitude_entry.get())
+            frequency = float(self.bonus_frequency_entry.get())
+            phase_shift = float(self.bonus_phase_entry.get())
+            num_samples = int(self.bonus_samples_entry.get())
+            sampling_freq = float(self.bonus_sampling_freq_entry.get())
+
+            if sampling_freq < 2 * frequency:
+                messagebox.showerror("Error", "Sampling frequency must be at least twice the frequency of the sine wave (Nyquist rate).")
+                return
+
+            # Generate sine wave
+            sine_signal = Signal.generate_sine(amplitude, phase_shift, frequency, sampling_freq, num_samples)
+            name = f"Sine_A{amplitude}_F{frequency}_P{phase_shift}"
+            self.bonus_signals['sine'] = sine_signal
+            self.signals[name] = sine_signal  # Also store in main signals dictionary
+
+            # Plot sine wave
+            ax = self.bonus_axes[0, 0]
+            ax.clear()
+            ax.plot(sine_signal.time_values, sine_signal.samples, label='Sine Wave', color='blue')
+            ax.set_title("Sine Wave")
+            ax.set_xlabel("Time (s)")
+            ax.set_ylabel("Amplitude")
+            ax.legend()
+            ax.grid(True)
+
+            # Clear the autocorrelation plot
+            self.bonus_axes[0, 1].clear()
+            self.bonus_axes[0, 1].set_title("Autocorrelation of Sine Wave")
+            self.bonus_axes[0, 1].set_xlabel("Lag")
+            self.bonus_axes[0, 1].set_ylabel("Correlation")
+            self.bonus_axes[0, 1].grid(True)
+
+            # Clear noise plot
+            self.bonus_axes[0, 2].clear()
+            self.bonus_axes[0, 2].set_title("AWGN Noise")
+            self.bonus_axes[0, 2].set_xlabel("Sample Index")
+            self.bonus_axes[0, 2].set_ylabel("Amplitude")
+            self.bonus_axes[0, 2].grid(True)
+
+            # Clear corrupted signal plot
+            self.bonus_axes[1, 0].clear()
+            self.bonus_axes[1, 0].set_title("Corrupted Sine Wave with AWGN")
+            self.bonus_axes[1, 0].set_xlabel("Sample Index")
+            self.bonus_axes[1, 0].set_ylabel("Amplitude")
+            self.bonus_axes[1, 0].grid(True)
+
+            # Clear autocorrelation of corrupted signal plot
+            self.bonus_axes[1, 1].clear()
+            self.bonus_axes[1, 1].set_title("Autocorrelation of Corrupted Signal")
+            self.bonus_axes[1, 1].set_xlabel("Lag")
+            self.bonus_axes[1, 1].set_ylabel("Correlation")
+            self.bonus_axes[1, 1].grid(True)
+
+            self.bonus_canvas.draw()
+
+            messagebox.showinfo("Success", f"Sine wave '{name}' generated and plotted.")
+
+        except ValueError:
+            messagebox.showerror("Error", "Please enter valid numerical values.")
+
+
+    def autocorrelate_sine(self):
+        if 'sine' not in self.bonus_signals:
+            messagebox.showwarning("Warning", "Please generate the sine wave first.")
+            return
+
+        sine_signal = self.bonus_signals['sine']
+        autocorr_signal = SignalOperations.correlate(sine_signal, sine_signal)
+        self.bonus_signals['autocorr_sine'] = autocorr_signal
+        self.signals['Autocorr_Sine'] = autocorr_signal  # Store in main signals
+
+        # Plot autocorrelation
+        ax = self.bonus_axes[0, 1]
+        ax.clear()
+        ax.plot(autocorr_signal.indices, autocorr_signal.samples, label='Autocorrelation', color='purple')
+        ax.set_title("Autocorrelation of Sine Wave")
+        ax.set_xlabel("Lag")
+        ax.set_ylabel("Correlation")
+        ax.legend()
+        ax.grid(True)
+
+        self.bonus_canvas.draw()
+
+        messagebox.showinfo("Success", "Autocorrelation of sine wave computed and plotted.")
+
+    def generate_bonus_noise(self):
+        try:
+            if 'sine' not in self.bonus_signals:
+                messagebox.showwarning("Warning", "Please generate the sine wave first.")
+                return
+
+            sine_signal = self.bonus_signals['sine']
+            num_samples = len(sine_signal.samples)
+
+            # Generate AWGN with zero mean and standard deviation
+            noise_std = 0.5  # Fixed standard deviation; can be made adjustable if desired
+            noise_samples = np.random.normal(0, noise_std, num_samples)
+            noise_signal = Signal(list(range(num_samples)), noise_samples.tolist())
+            name = f"AWGN_Std{noise_std}"
+            self.bonus_signals['noise'] = noise_signal
+            self.signals[name] = noise_signal  # Store in main signals
+
+            # Plot noise
+            ax = self.bonus_axes[0, 2]
+            ax.clear()
+            ax.plot(noise_signal.indices, noise_signal.samples, label='AWGN Noise', color='orange')
+            ax.set_title("AWGN Noise")
+            ax.set_xlabel("Sample Index")
+            ax.set_ylabel("Amplitude")
+            ax.legend()
+            ax.grid(True)
+
+            self.bonus_canvas.draw()
+
+            messagebox.showinfo("Success", f"AWGN noise '{name}' generated and plotted.")
+
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to generate noise: {e}")
+
+    def add_noise_to_sine(self):
+        if 'sine' not in self.bonus_signals or 'noise' not in self.bonus_signals:
+            messagebox.showwarning("Warning", "Please generate both sine wave and noise first.")
+            return
+
+        sine_signal = self.bonus_signals['sine']
+        noise_signal = self.bonus_signals['noise']
+
+        # Ensure both signals have the same number of samples
+        if len(sine_signal.samples) != len(noise_signal.samples):
+            messagebox.showerror("Error", "Sine wave and noise signals must have the same number of samples.")
+            return
+
+        # Add noise to sine
+        corrupted_samples = np.array(sine_signal.samples) + np.array(noise_signal.samples)
+        corrupted_signal = Signal(sine_signal.indices, corrupted_samples.tolist())
+        name = "Corrupted_Sine_Noise"
+        self.bonus_signals['corrupted'] = corrupted_signal
+        self.signals[name] = corrupted_signal  # Store in main signals
+
+        # Plot corrupted signal
+        ax = self.bonus_axes[1, 0]
+        ax.clear()
+        ax.plot(corrupted_signal.indices, corrupted_signal.samples, label='Sine + Noise', color='green')
+        ax.set_title("Corrupted Sine Wave with AWGN")
+        ax.set_xlabel("Sample Index")
+        ax.set_ylabel("Amplitude")
+        ax.legend()
+        ax.grid(True)
+
+        self.bonus_canvas.draw()
+
+        messagebox.showinfo("Success", "Noise added to sine wave and plotted.")
+
+
+
+    def autocorrelate_corrupted(self):
+        if 'corrupted' not in self.bonus_signals:
+            messagebox.showwarning("Warning", "Please add noise to the sine wave first.")
+            return
+
+        corrupted_signal = self.bonus_signals['corrupted']
+        autocorr_corrupted = SignalOperations.correlate(corrupted_signal, corrupted_signal)
+        self.bonus_signals['autocorr_corrupted'] = autocorr_corrupted
+        self.signals['Autocorr_Corrupted'] = autocorr_corrupted  # Store in main signals
+
+        # Plot autocorrelation of corrupted signal
+        ax = self.bonus_axes[1, 1]
+        ax.clear()
+        ax.plot(autocorr_corrupted.indices, autocorr_corrupted.samples, label='Autocorrelation', color='red')
+        ax.set_title("Autocorrelation of Corrupted Signal")
+        ax.set_xlabel("Lag")
+        ax.set_ylabel("Correlation")
+        ax.legend()
+        ax.grid(True)
+
+        self.bonus_canvas.draw()
+
+        messagebox.showinfo("Success", "Autocorrelation of corrupted signal computed and plotted.")
+
+    
+
+
 
 def compare_signals(signal1, signal2, tolerance=1e-3):
     if signal1.indices != signal2.indices:
