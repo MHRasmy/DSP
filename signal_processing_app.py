@@ -194,6 +194,232 @@ class SignalOperations:
             samples.append(sample / N)
         return samples
 
+    # -----------------------------
+    # Task A: Correlation
+    # -----------------------------
+    @staticmethod
+    def correlate(signal1, signal2):
+        """
+        Compute the normalized cross-correlation of two signals with windowed normalization.
+        r_xy(m) = sum x(n)*y(n - m) / sqrt( sum x(n)^2 * sum y(n -m)^2 )
+        where the sums are over overlapping samples for each m.
+        """
+        x = signal1.samples
+        y = signal2.samples
+        len_x = len(x)
+        len_y = len(y)
+        corr_len = len_x + len_y -1
+        r_xy = [0] * corr_len
+
+        # Indices for correlation from -(len_y-1) to +(len_x-1)
+        start_index = -(len_y -1)
+
+        for m in range(corr_len):
+            shift = m - (len_y -1)
+            sum_xy = 0
+            sum_x2 = 0
+            sum_y2 = 0
+            for n in range(len_x):
+                y_idx = n - shift
+                if 0 <= y_idx < len_y:
+                    sum_xy +=x[n]*y[y_idx]
+                    sum_x2 +=x[n]**2
+                    sum_y2 +=y[y_idx]**2
+            if sum_x2 >0 and sum_y2 >0:
+                r_xy[m] = sum_xy / math.sqrt(sum_x2 * sum_y2)
+            else:
+                r_xy[m] = 0  # Handle cases with no overlap or zero norm
+
+        indices = [start_index + i for i in range(corr_len)]
+        return Signal(indices, r_xy)
+
+    @staticmethod
+    def time_delay_from_correlation(corr_signal):
+        """
+        Finds the lag at which correlation is maximum in absolute value.
+        """
+        samples = corr_signal.samples
+        indices = corr_signal.indices
+        max_val = max(samples, key=abs)
+        max_idx = samples.index(max_val)
+        delay = indices[max_idx]  # The index (lag) where max correlation occurs
+        return delay
+
+    @staticmethod
+    def classify_signal_by_correlation(signal_to_classify, classA_template, classB_template):
+        """
+        Using correlation-based classification:
+          1) Correlate the input signal with classA_template => max corr_A
+          2) Correlate the input signal with classB_template => max corr_B
+          3) Compare average of those max correlation values with a threshold
+             (or simply decide if max corr_A > max corr_B => Class A, else Class B).
+        This is a placeholder approach; the exact classification depends on your lab instructions.
+        """
+        corrA = SignalOperations.correlate(signal_to_classify, classA_template)
+        corrB = SignalOperations.correlate(signal_to_classify, classB_template)
+
+        maxA = max(corrA.samples, key=abs)
+        maxB = max(corrB.samples, key=abs)
+
+        # Example rule: if abs(maxA) > abs(maxB), classify as A
+        if abs(maxA) > abs(maxB):
+            return "Class A"
+        else:
+            return "Class B"
+
+    # -----------------------------
+    # Task B: Filtering
+    # -----------------------------
+    @staticmethod
+    def design_fir_filter(filter_specs):
+        """
+        filter_specs is a dictionary that might have:
+          {
+            'FilterType': 'Low pass' | 'High pass' | 'Band pass' | 'Band stop',
+            'FS': <float>,
+            'StopBandAttenuation': <float>,
+            'FC': <float> or 'F1': <float>, 'F2': <float>,
+            'TransitionBand': <float>,
+            ...
+          }
+        Return the computed FIR filter h(n) as a Signal object with symmetrical indices.
+        """
+        # We'll do a minimal window-based approach.
+        ftype = filter_specs.get('FilterType', 'Low pass').lower()
+        fs = float(filter_specs.get('FS', 8000))
+        A_s = float(filter_specs.get('StopBandAttenuation', 50))
+        # For low/high pass => 'FC' in specs
+        # For band pass/stop => 'F1' and 'F2'
+
+        # 1) Compute normalized frequencies
+        if ftype in ['low pass', 'high pass']:
+            fc = float(filter_specs.get('FC', 1500))
+            trans = float(filter_specs.get('TransitionBand', 500))
+            # Adjust for transition: e.g. fc' = fc ± trans/2 for certain implementations
+            # We'll do a simplified approach.
+            # For demonstration:
+            delta_f = trans
+            # Compute normalized frequencies:
+            wc = (2 * math.pi) * (fc / fs)
+        else:
+            f1 = float(filter_specs.get('F1', 150))
+            f2 = float(filter_specs.get('F2', 250))
+            trans = float(filter_specs.get('TransitionBand', 50))
+            delta_f = trans
+            w1 = (2 * math.pi) * (f1 / fs)
+            w2 = (2 * math.pi) * (f2 / fs)
+
+        # 2) Compute filter order (N) using formula based on A_s, delta_f
+        # This is a typical approximation. For better accuracy, apply Kaiser or other methods.
+        # We'll do a placeholder approach:
+        # For example, we might do:
+        if A_s <= 21:
+            alpha = 0
+        elif A_s <= 50:
+            alpha = 0.5842 * (A_s - 21) ** 0.4 + 0.07886 * (A_s - 21)
+        else:
+            alpha = 0.1102 * (A_s - 8.7)
+
+        # Approx for Kaiser window (Delta_f in Hz => normalized is delta_f/fs)
+        d_f_normalized = delta_f / fs
+        # Typical formula: N ~ (A_s - 8) / (2.285 * 2*pi* d_f_normalized) but let's simplify
+        # We'll do a rough approach:
+        N_approx = (A_s - 8.0) / (2.285 * 2 * math.pi * d_f_normalized)
+        N = int(np.ceil(N_approx))
+        if (N % 2) == 0:
+            N += 1  # Ensure it's odd
+
+        # 3) Compute ideal filter hd(n):
+        #    For low pass:
+        #       hd(n) = wc/pi * sinc(...)
+        #    For high pass:
+        #       hd(n) = ...
+        #    For band pass:
+        #       ...
+        # We'll create a symmetrical index: from -M to +M, where M = (N-1)//2
+        M = (N - 1) // 2
+        hd = []
+        for n in range(-M, M + 1):
+            if ftype == 'low pass':
+                # ideal LPF: sin(wc * n) / (pi * n)
+                if n == 0:
+                    val = wc / math.pi  # since sin(0)/0 => limit
+                else:
+                    val = math.sin(wc * n) / (math.pi * n)
+                hd.append(val)
+            elif ftype == 'high pass':
+                # ideal HPF: delta(n) - LPF => or sin(pi*n) - sin(wc*n) / pi*n
+                # Simplify the standard formula: h_hp(n) = (-1)^n * h_lp(n) (for zero-phase)
+                if n == 0:
+                    val = 1.0 - ( (2 * fc) / fs )  # or (math.pi - wc)/ math.pi
+                else:
+                    val = - (math.sin(wc * n) / (math.pi * n))
+                hd.append(val)
+            elif ftype == 'band pass':
+                # ideal BPF: h_bpf(n) = [ sin(w2*n) - sin(w1*n ) ] / (pi*n)
+                if n == 0:
+                    val = (w2 - w1) / math.pi
+                else:
+                    val = (math.sin(w2 * n) - math.sin(w1 * n)) / (math.pi * n)
+                hd.append(val)
+            else:
+                # band stop: h_bsf(n) = delta(n) - bandpass
+                # or h_bsf(n) = h_lp(fc1) + h_hp(fc2) ...
+                if n == 0:
+                    val = 1.0 - ( (w2 - w1) / math.pi )
+                else:
+                    val = - (math.sin(w2 * n) - math.sin(w1 * n)) / (math.pi * n)
+                hd.append(val)
+
+        # 4) Compute window w(n). For simplicity, let's do a simple Hamming window.
+        #   w[n] = 0.54 - 0.46 cos(2*pi*n / (N-1))
+        w = []
+        for i, n in enumerate(range(-M, M + 1)):
+            wval = 0.54 - 0.46 * math.cos(2 * math.pi * (i) / (N - 1))
+            w.append(wval)
+
+        # 5) Multiply hd(n) * w(n) => h(n)
+        h = [hd_i * w_i for hd_i, w_i in zip(hd, w)]
+
+        # Construct the final filter as a Signal. Indices from -M..M
+        indices = list(range(-M, M + 1))
+        return Signal(indices, h)
+
+    @staticmethod
+    def filter_signal(signal, fir_filter, method='time'):
+        """
+        Filter the input 'signal' with 'fir_filter' in either 'time' or 'freq'.
+        If 'time', do standard convolution.
+        If 'freq', do frequency multiplication => IDFT( DFT(x) * DFT(h) ).
+        """
+        if method == 'time':
+            return SignalOperations.convolve(signal, fir_filter)
+        else:
+            # freq-domain method
+            N = len(signal.samples) + len(fir_filter.samples) - 1
+            # zero-pad to length N
+            x_padded = Signal(signal.indices, signal.samples + [0]*(N - len(signal.samples)))
+            h_padded = Signal(fir_filter.indices, fir_filter.samples + [0]*(N - len(fir_filter.samples)))
+            X_real, X_imag = SignalOperations.compute_dft(x_padded)
+            H_real, H_imag = SignalOperations.compute_dft(h_padded)
+
+            # Multiply in frequency
+            Y_real = []
+            Y_imag = []
+            for rX, iX, rH, iH in zip(X_real, X_imag, H_real, H_imag):
+                # (rX + j iX)(rH + j iH) = (rX*rH - iX*iH) + j(rX*iH + iX*rH)
+                yr = (rX * rH) - (iX * iH)
+                yi = (rX * iH) + (iX * rH)
+                Y_real.append(yr)
+                Y_imag.append(yi)
+
+            # IDFT
+            y_samples = SignalOperations.compute_idft(Y_real, Y_imag)
+            # Indices => start_index = sum of start indices
+            start_index = signal.indices[0] + fir_filter.indices[0]
+            indices = list(range(start_index, start_index + N))
+            return Signal(indices, y_samples)
+
 # Signal Processing App with GUI
 class SignalProcessingApp:
     def __init__(self, root):
@@ -204,30 +430,33 @@ class SignalProcessingApp:
         self.create_widgets()
 
     def create_widgets(self):
-        # Create a Notebook for tabs
         notebook = ttk.Notebook(self.root)
         notebook.pack(expand=True, fill='both')
 
-        # Create frames for each tab
         task1_frame = ttk.Frame(notebook)
         task2_frame = ttk.Frame(notebook)
         task3_frame = ttk.Frame(notebook)
         task4_frame = ttk.Frame(notebook)
         task5_frame = ttk.Frame(notebook)
+        taskA_frame = ttk.Frame(notebook)
+        taskB_frame = ttk.Frame(notebook)
 
-        # Add tabs to notebook
         notebook.add(task1_frame, text='Task 1 - Signal Operations')
         notebook.add(task2_frame, text='Task 2 - Signal Generation')
         notebook.add(task3_frame, text='Task 3 - Quantization')
         notebook.add(task4_frame, text='Task 4 - Advanced Operations')
         notebook.add(task5_frame, text='Task 5 - Fourier Transform')
+        # New Tabs
+        notebook.add(taskA_frame, text='Task A - Correlation')
+        notebook.add(taskB_frame, text='Task B - Filtering')
 
-        # Create widgets for each task
         self.create_task1_widgets(task1_frame)
         self.create_task2_widgets(task2_frame)
         self.create_task3_widgets(task3_frame)
         self.create_task4_widgets(task4_frame)
         self.create_task5_widgets(task5_frame)
+        self.create_taskA_widgets(taskA_frame)
+        self.create_taskB_widgets(taskB_frame)
 
     # Task 1 Widgets
     def create_task1_widgets(self, frame):
@@ -811,15 +1040,199 @@ class SignalProcessingApp:
         indices = list(range(self.N))
         self.signals[name] = Signal(indices, reconstructed_samples)
         messagebox.showinfo("Success", f"Signal reconstructed successfully as '{name}'.")
+    
+
+    # =======================
+    # Task A: Correlation
+    # =======================
+    def create_taskA_widgets(self, frame):
+        operations_frame = ttk.LabelFrame(frame, text="Correlation Tasks")
+        operations_frame.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
+
+        # Buttons to load signals
+        ttk.Button(operations_frame, text="Load Correlation Signal 1", command=lambda: self.load_signal('Corr1')).grid(row=0, column=0, padx=5, pady=5)
+        ttk.Button(operations_frame, text="Load Correlation Signal 2", command=lambda: self.load_signal('Corr2')).grid(row=0, column=1, padx=5, pady=5)
+
+        corr_btn = ttk.Button(operations_frame, text="Compute Correlation", command=self.compute_correlation)
+        corr_btn.grid(row=1, column=0, padx=5, pady=5)
+
+        delay_btn = ttk.Button(operations_frame, text="Estimate Time Delay", command=self.estimate_time_delay)
+        delay_btn.grid(row=1, column=1, padx=5, pady=5)
+
+        classify_btn = ttk.Button(operations_frame, text="Classify (A or B)", command=self.classify_signal)
+        classify_btn.grid(row=2, column=0, columnspan=2, pady=5)
+
+        # Plot Frame
+        plot_frame = ttk.Frame(frame)
+        plot_frame.grid(row=0, column=1, padx=10, pady=10)
+
+        self.taskA_figure, self.taskA_ax = plt.subplots(figsize=(8,6))
+        self.taskA_canvas = FigureCanvasTkAgg(self.taskA_figure, master=plot_frame)
+        self.taskA_canvas.draw()
+        self.taskA_canvas.get_tk_widget().pack()
+
+    def compute_correlation(self):
+        if 'Corr1' not in self.signals or 'Corr2' not in self.signals:
+            messagebox.showwarning("Warning", "Please load both correlation signals.")
+            return
+        signal1 = self.signals['Corr1']
+        signal2 = self.signals['Corr2']
+
+        corr_signal = SignalOperations.correlate(signal1, signal2)
+        name = f"Correlation_{len(self.signals)+1}"
+        self.signals[name] = corr_signal
+        messagebox.showinfo("Success", f"Correlation computed successfully as '{name}'.")
+
+        # Plot
+        self.taskA_ax.clear()
+        self.taskA_ax.plot(corr_signal.indices, corr_signal.samples, label='Correlation')
+        self.taskA_ax.set_xlabel('Lag')
+        self.taskA_ax.set_ylabel('Correlation Amplitude')
+        self.taskA_ax.set_title("Correlation of two signals")
+        self.taskA_ax.legend()
+        self.taskA_ax.grid(True)
+        self.taskA_canvas.draw()
+
+    def estimate_time_delay(self):
+        # We assume we have a correlation signal saved under some name (e.g., "Correlation_#")
+        # For simplicity, let's pick the last correlation we computed
+        corr_keys = [k for k in self.signals.keys() if "Correlation_" in k]
+        if not corr_keys:
+            messagebox.showwarning("Warning", "No correlation signal found. Please compute correlation first.")
+            return
+        corr_signal = self.signals[corr_keys[-1]]
+        delay = SignalOperations.time_delay_from_correlation(corr_signal)
+        messagebox.showinfo("Time Delay", f"Estimated time delay (lag) is: {delay}")
+
+    def classify_signal(self):
+        # Example usage: we assume we have "CorrSignal" to classify with "ClassA_template" and "ClassB_template"
+        if 'Corr1' not in self.signals or 'ClassA_template' not in self.signals or 'ClassB_template' not in self.signals:
+            messagebox.showwarning("Warning", "Please load all required signals: Corr1, ClassA_template, ClassB_template.")
+            return
+        to_classify = self.signals['Corr1']
+        classA_template = self.signals['ClassA_template']
+        classB_template = self.signals['ClassB_template']
+
+        c = SignalOperations.classify_signal_by_correlation(to_classify, classA_template, classB_template)
+        messagebox.showinfo("Classification", f"Signal classified as: {c}")
+
+    # =======================
+    # Task B: Filtering
+    # =======================
+    def create_taskB_widgets(self, frame):
+        operations_frame = ttk.LabelFrame(frame, text="Filtering Tasks")
+        operations_frame.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
+
+        # Buttons to load input signal
+        ttk.Button(operations_frame, text="Load Signal for Filtering", command=lambda: self.load_signal('FilterInput')).grid(row=0, column=0, padx=5, pady=5)
+
+        # Provide a way to load filter specs from a file
+        ttk.Button(operations_frame, text="Load Filter Specs", command=self.load_filter_specs).grid(row=0, column=1, padx=5, pady=5)
+
+        # Button to compute FIR filter
+        compute_filter_btn = ttk.Button(operations_frame, text="Compute FIR Filter", command=self.compute_fir_filter)
+        compute_filter_btn.grid(row=1, column=0, padx=5, pady=5)
+
+        # Button to filter signal
+        filter_signal_btn = ttk.Button(operations_frame, text="Apply Filter", command=self.apply_filter)
+        filter_signal_btn.grid(row=1, column=1, padx=5, pady=5)
+
+        # Choice of method
+        self.filter_method = tk.StringVar(value="time")
+        ttk.Radiobutton(operations_frame, text="Time Convolution", variable=self.filter_method, value="time").grid(row=2, column=0, padx=5, pady=5)
+        ttk.Radiobutton(operations_frame, text="Freq Multiplication", variable=self.filter_method, value="freq").grid(row=2, column=1, padx=5, pady=5)
+
+        # Plot Frame
+        plot_frame = ttk.Frame(frame)
+        plot_frame.grid(row=0, column=1, padx=10, pady=10)
+
+        self.taskB_figure, self.taskB_ax = plt.subplots(figsize=(8,6))
+        self.taskB_canvas = FigureCanvasTkAgg(self.taskB_figure, master=plot_frame)
+        self.taskB_canvas.draw()
+        self.taskB_canvas.get_tk_widget().pack()
+
+        # Store filter specs
+        self.filter_specs = {}
+
+    def load_filter_specs(self):
+        file_path = filedialog.askopenfilename(title="Select Filter Specification File", filetypes=(("Text Files", "*.txt"),))
+        if file_path:
+            specs = {}
+            with open(file_path, 'r') as f:
+                lines = f.readlines()
+                for line in lines:
+                    line = line.strip()
+                    if '=' in line:
+                        key, val = line.split('=')
+                        key = key.strip()
+                        val = val.strip()
+                        specs[key] = val
+            self.filter_specs = specs
+            messagebox.showinfo("Success", "Filter specifications loaded.")
+
+    def compute_fir_filter(self):
+        if not self.filter_specs:
+            messagebox.showwarning("Warning", "Please load filter specs first.")
+            return
+        fir_signal = SignalOperations.design_fir_filter(self.filter_specs)
+        name = f"FIR_Filter_{len(self.signals)+1}"
+        self.signals[name] = fir_signal
+        messagebox.showinfo("Success", f"FIR filter computed successfully as '{name}'.")
+        # Plot the filter
+        self.taskB_ax.clear()
+        self.taskB_ax.stem(fir_signal.indices, fir_signal.samples, label='FIR Filter Coeffs', use_line_collection=True)
+        self.taskB_ax.set_xlabel('n')
+        self.taskB_ax.set_ylabel('h(n)')
+        self.taskB_ax.set_title("FIR Filter Coefficients")
+        self.taskB_ax.legend()
+        self.taskB_ax.grid(True)
+        self.taskB_canvas.draw()
+
+    def apply_filter(self):
+        # We assume we have 'FilterInput' signal and a 'FIR_Filter_#' signal
+        filter_keys = [k for k in self.signals.keys() if "FIR_Filter_" in k]
+        if 'FilterInput' not in self.signals or not filter_keys:
+            messagebox.showwarning("Warning", "Please load input signal and compute FIR filter first.")
+            return
+        input_signal = self.signals['FilterInput']
+        fir_filter = self.signals[filter_keys[-1]]
+        method = self.filter_method.get()
+
+        filtered_signal = SignalOperations.filter_signal(input_signal, fir_filter, method=method)
+        name = f"Filtered_Signal_{len(self.signals)+1}"
+        self.signals[name] = filtered_signal
+        messagebox.showinfo("Success", f"Signal filtered by FIR in {method} domain as '{name}'.")
+
+        # Plot
+        self.taskB_ax.clear()
+        self.taskB_ax.plot(filtered_signal.indices, filtered_signal.samples, label='Filtered Signal')
+        self.taskB_ax.set_xlabel('n')
+        self.taskB_ax.set_ylabel('Amplitude')
+        self.taskB_ax.set_title("Filtered Signal")
+        self.taskB_ax.legend()
+        self.taskB_ax.grid(True)
+        self.taskB_canvas.draw()
 
     # Existing methods for Task 1
     def load_signal(self, signal_number):
-        file_path = filedialog.askopenfilename(title="Select Signal File", filetypes=(("Text Files", "*.txt"),))
+        """
+        Overloaded so we can pass a string like 'Corr1' or 'FilterInput' 
+        or an integer 1/2 for the older code.
+        """
+        file_path = filedialog.askopenfilename(
+            title="Select Signal File", 
+            filetypes=(("Text Files", "*.txt"),)
+        )
         if file_path:
             try:
                 signal = Signal.from_file(file_path)
-                self.signals[f"Signal{signal_number}"] = signal
-                messagebox.showinfo("Success", f"Signal {signal_number} loaded successfully.")
+                # If signal_number is an int, do the old behavior
+                if isinstance(signal_number, int):
+                    self.signals[f"Signal{signal_number}"] = signal
+                    messagebox.showinfo("Success", f"Signal {signal_number} loaded successfully.")
+                else:
+                    self.signals[signal_number] = signal
+                    messagebox.showinfo("Success", f"Signal '{signal_number}' loaded successfully.")
             except Exception as e:
                 messagebox.showerror("Error", f"Failed to load signal: {e}")
 
@@ -941,6 +1354,48 @@ def compare_signals(signal1, signal2, tolerance=1e-3):
         if abs(s1 - s2) > tolerance:
             return False
     return True
+
+def Compare_Signals(file_name, Your_indices, Your_samples):      
+    expected_indices=[]
+    expected_samples=[]
+    with open(file_name, 'r') as f:
+        line = f.readline()
+        line = f.readline()
+        line = f.readline()
+        line = f.readline()
+        while line:
+            L=line.strip()
+            if len(L.split(' '))==2:
+                L=line.split(' ')
+                V1=int(L[0])
+                V2=float(L[1])
+                expected_indices.append(V1)
+                expected_samples.append(V2)
+                line = f.readline()
+            else:
+                break
+
+    print("Current Output Test file is: ")
+    print(file_name)
+    print("\n")
+
+    if (len(expected_samples)!=len(Your_samples)) and (len(expected_indices)!=len(Your_indices)):
+        print("Test case failed, your signal has different length from the expected one")
+        return
+
+    for i in range(len(Your_indices)):
+        if (Your_indices[i] != expected_indices[i]):
+            print("Test case failed, your signal has different indices from the expected one") 
+            return
+
+    for i in range(len(expected_samples)):
+        if abs(Your_samples[i] - expected_samples[i]) < 0.01:
+            continue
+        else:
+            print("Test case failed, your signal has different values from the expected one") 
+            return
+
+    print("Test case passed successfully")
 
 # Compare functions for DFT amplitudes and phases
 def SignalComapreAmplitude(SignalInput=[], SignalOutput=[], tolerance=1e-3):
